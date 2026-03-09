@@ -15,7 +15,7 @@ private:
     std::vector<bool> table;
 
 public:
-    // Konstruktor
+    // Konstruktor,table(n, false)- tablica n elementow , wszystkie to false
     SetSimple(size_t n) : N(n), table(n, false) {}
 
     // --- Operacje Element-Zbiór ---
@@ -45,6 +45,7 @@ public:
     // --- Operacje Zbiór-Zbiór ---
 
     // Suma zbiorów (OR): O(N)
+    // Wywołanie: A.setUnion(B)
     SetSimple setUnion(const SetSimple& other) const {
         // Zakładamy, że zbiory mają to samo uniwersum N
         SetSimple result(N);
@@ -158,6 +159,7 @@ void measureComplexity(size_t N) {
 
     // Wypełnianie losowe (aby operacje miały co robić)
     // Używamy deterministycznego ziarna dla powtarzalności
+    // losowe liczby z zakresu 0 -> N-1
     std::mt19937 gen(42);
     std::uniform_int_distribution<> dis(0, N - 1);
 
@@ -203,6 +205,7 @@ void runBenchmarks() {
     std::cout << "Dla operacji Insert (O(1)) mierzymy srednia z 100k powtorzen (w nanosekundach).\n";
     std::cout << "Dla operacji na zbiorach (O(N)) mierzymy pojedyncze wykonanie (w mikrosekundach).\n\n";
 
+    // setw -> robi tabele , o width : np 10
     std::cout << std::setw(10) << "N (Size)"
               << std::setw(20) << "Insert [ns]"
               << std::setw(20) << "Union [us]"
