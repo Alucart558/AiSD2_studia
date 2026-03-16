@@ -1,0 +1,56 @@
+Co wklejasz do gnuplota i co powinieneś widzieć
+-----------------------------------------------
+
+Po uruchomieniu każdego programu:
+
+Projekt_0_A/main.cpp (SetSimple) – z konsoli kopiujesz środkową tabelę:
+Kolumny: N Insert[ns] Union[us] Intersect[us]
+Zapisz do pliku: setsimple.dat
+
+Projekt_1_B/setLinked.cpp – z konsoli kopiujesz tabelę:
+Kolumny: N Insert[us] Contains[us] Remove[us]
+Zapisz do pliku: setlinked.dat
+
+Projekt_1_D/simple_set_analysis.cpp – z konsoli kopiujesz tabelę:
+Kolumny: N insert[ms] contains[ms] remove[ms]
+Zapisz do pliku: simpleset.dat
+
+Przykładowy gnuplot:
+
+# SetSimple
+set title 'SetSimple (Projekt_0_A)'
+set xlabel 'N (rozmiar uniwersum)'
+set ylabel 'czas'
+plot 'setsimple.dat' using 1:2 with linespoints title 'Insert (ns)', \
+     '' using 1:3 with linespoints title 'Union (us)', \
+     '' using 1:4 with linespoints title 'Intersect (us)'
+
+# setLinked
+set title 'setLinked (Projekt_1_B)'
+set xlabel 'N (liczba elementow w zbiorze)'
+set ylabel 'czas [us]'
+plot 'setlinked.dat' using 1:2 with linespoints title 'Insert (us)', \
+     '' using 1:3 with linespoints title 'Contains (us)', \
+     '' using 1:4 with linespoints title 'Remove (us)'
+
+# SimpleSet (vector<string>)
+set title 'SimpleSet (Projekt_1_D)'
+set xlabel 'N (liczba elementow)'
+set ylabel 'czas [ms]'
+plot 'simpleset.dat' using 1:2 with linespoints title 'insert (ms)', \
+     '' using 1:3 with linespoints title 'contains (ms)', \
+     '' using 1:4 with linespoints title 'remove (ms)'
+
+Oczekiwane kształty:
+
+SetSimple:
+- Insert: prawie pozioma linia (O(1)).
+- Union, Intersect: linie rosnące ~ liniowo z N (O(N)).
+
+setLinked:
+- Wszystkie trzy linie (Insert, Contains, Remove) rosną ~ liniowo z N (O(n) na operację).
+
+SimpleSet (vector<string> + std::find):
+- Całkowite czasy insert/contains/remove rosną szybciej niż liniowo (z grubsza ~N^2),
+  bo dla każdego N wykonujemy N operacji O(n).
+- Jeżeli podzielimy czas przez N, średni czas pojedynczej operacji rośnie ~ liniowo z N (O(n)).
