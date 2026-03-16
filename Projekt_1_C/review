@@ -1,0 +1,49 @@
+SetSimple (Projekt_0_A)
+
+Data Structure: Uses a std::vector<bool> to represent a set, where each index corresponds to an element in the universe.
+
+Operations:
+*Insert/Remove/Contains: O(1) time complexity.
+*Set Operations (Union, Intersection, Difference): O(N), where N is the size of the universe.
+
+Advantages:
+
+*Very efficient for operations on small, dense sets with a fixed universe size.
+*Memory-efficient due to std::vector<bool> specialization.
+*Simple implementation and predictable performance.
+
+Disadvantages:
+
+*Limited to a fixed universe size.
+*Inefficient for sparse sets with large universe sizes, as memory usage grows linearly with the universe size.
+
+setLinked (Projekt_1_B)
+
+Data Structure: A linked list of nodes, where each node represents an element in the set.
+
+Operations:
+
+*Insert/Remove/Contains: O(n) time complexity, where n is the number of elements in the set.
+*Set Operations: Not implemented, but would require O(n^2) for naive implementations.
+
+Advantages:
+
+*Memory-efficient for sparse sets, as memory usage grows with the number of elements rather than the universe size.
+*Flexible, as it does not require a fixed universe size.
+
+Disadvantages:
+
+*Slower operations compared to SetSimple for dense sets or frequent operations.
+*More complex implementation and less predictable performance.
+
+Recommendations
+
+Use SetSimple:
+*When the universe size is small and fixed.
+*When operations need to be fast and predictable.
+*For applications requiring frequent set operations (e.g., union, intersection).
+
+Use setLinked:
+*When the universe size is large or unknown.
+*When the set is sparse (contains few elements relative to the universe size).
+*For applications where memory usage is a concern for large, sparse sets.
