@@ -1,176 +1,66 @@
-#include <iostream>
-#include <vector>
-#include <random>
-#include <chrono>
-#include <fstream>
-#include <stdexcept>
-#include <iostream>
-#include <vector>
-#include <random>
-#include <chrono>
-#include <fstream>
-#include <stdexcept>
-#include <filesystem>
-#include <string>
 #include <algorithm>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <random>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 class setHashed {
 public:
     explicit setHashed(std::size_t bucketCount)
-        : N(bucketCount), buckets(bucketCount, nullptr), elementCount(0) {
+        : N(bucketCount), buckets(bucketCount), elementCount(0) {
         if (N == 0) throw std::invalid_argument("bucketCount must be > 0");
     }
 
-    ~setHashed() { clear(); }
-
-    //konstruktor kopiujacy
-    setHashed(const setHashed& other)
-        : N(other.N), buckets(other.N, nullptr), elementCount(0) {
-        for (std::size_t i = 0; i < N; ++i) {
-            Node* p = other.buckets[i];
-            Node* prevNew = nullptr;
-            while (p) {
-                Node* n = new Node(p->value);
-                if (!prevNew) buckets[i] = n;
-                else prevNew->next = n;
-                prevNew = n;
-                p = p->next;
-                ++elementCount;
-            }
-        }
-    }
-
-    //replace the current object’s contents with a deep copy of other.
-    setHashed& operator=(const setHashed& other) {
-        if (this == &other) return *this;
-        clear();
-        N = other.N;
-        buckets.assign(N, nullptr);
-        elementCount = 0;
-
-        for (std::size_t i = 0; i < N; ++i) {
-            Node* p = other.buckets[i];
-            Node* prevNew = nullptr;
-            while (p) {
-                Node* n = new Node(p->value);
-                if (!prevNew) buckets[i] = n;
-                else prevNew->next = n;
-                prevNew = n;
-                p = p->next;
-                ++elementCount;
-            }
-        }
-        return *this;
-    }
-
-    // Optional: move for efficiency in benchmarks
-    setHashed(setHashed&& other) noexcept
-        : N(other.N), buckets(std::move(other.buckets)), elementCount(other.elementCount) {
-        other.N = 0;
-        other.elementCount = 0;
-        // buckets moved; leave other in safe destructible state
-    }
-
-    //transfer ownership of nodes from other to the new object *without copying*.
-    setHashed& operator=(setHashed&& other) noexcept {
-        if (this == &other) return *this;
-        clear();
-        N = other.N;
-        buckets = std::move(other.buckets);
-        elementCount = other.elementCount;
-        other.N = 0;
-        other.elementCount = 0;
-        return *this;
-    }
-
+    // Wstawia element x, jeśli go nie ma.
+    // Kubełek jest utrzymywany w porządku rosnącym.
     void insert(int x) {
-        std::size_t idx = hash(x);
-        Node*& head = buckets[idx];
-
-        if (!head) {
-            head = new Node(x);
-            ++elementCount;
-            return;
-        }
-
-        if (x < head->value) {
-            head = new Node(x, head);
-            ++elementCount;
-            return;
-        }
-        if (x == head->value) return;
-
-        Node* prev = head;
-        Node* curr = head->next;
-        while (curr && curr->value < x) {
-            prev = curr;
-            curr = curr->next;
-        }
-        if (curr && curr->value == x) return;
-
-        prev->next = new Node(x, curr);
+        //pokazuje konktetny bucket
+        auto& b = buckets[hash(x)];
+        //szuka miejsca w kubełku
+        auto it = std::lower_bound(b.begin(), b.end(), x);
+        if (it != b.end() && *it == x) return;   // już jest
+        b.insert(it, x);
         ++elementCount;
     }
 
+    // Usuwa element x, jeśli istnieje.
     void erase(int x) {
-        std::size_t idx = hash(x);
-        Node*& head = buckets[idx];
-        if (!head) return;
-
-        if (head->value == x) {
-            Node* tmp = head;
-            head = head->next;
-            delete tmp;
-            --elementCount;
-            return;
-        }
-
-        Node* prev = head;
-        Node* curr = head->next;
-        while (curr && curr->value < x) {
-            prev = curr;
-            curr = curr->next;
-        }
-        if (curr && curr->value == x) {
-            prev->next = curr->next;
-            delete curr;
-            --elementCount;
-        }
+        auto& b = buckets[hash(x)];
+        auto it = std::lower_bound(b.begin(), b.end(), x);
+        if (it == b.end() || *it != x) return;   // brak
+        b.erase(it);
+        --elementCount;
     }
 
+    // Sprawdza, czy element x jest w zbiorze.
     bool contains(int x) const {
-        std::size_t idx = hash(x);
-        Node* curr = buckets[idx];
-        while (curr && curr->value < x) curr = curr->next;
-        return curr && curr->value == x;
+        const auto& b = buckets[hash(x)];
+        auto it = std::lower_bound(b.begin(), b.end(), x);
+        return it != b.end() && *it == x;
     }
 
+    // Zwraca liczbę elementów w zbiorze.
     std::size_t size() const { return elementCount; }
 
+    // Czyści cały zbiór.
     void clear() {
-        // If N==0 \(\) after move, nothing to do
-        for (std::size_t i = 0; i < buckets.size(); ++i) {
-            Node* curr = buckets[i];
-            while (curr) {
-                Node* tmp = curr;
-                curr = curr->next;
-                delete tmp;
-            }
-            buckets[i] = nullptr;
-        }
+        for (auto& b : buckets) b.clear();
         elementCount = 0;
     }
 
+    // Wypisuje zbiór w kolejności kubełków (nie globalnie posortowany).
     void print(std::ostream& os = std::cout) const {
         os << "{ ";
         bool first = true;
-        for (std::size_t i = 0; i < buckets.size(); ++i) {
-            Node* curr = buckets[i];
-            while (curr) {
+        for (const auto& b : buckets) {
+            for (int v : b) {
                 if (!first) os << ", ";
-                os << curr->value;
+                os << v;
                 first = false;
-                curr = curr->next;
             }
         }
         os << " }";
@@ -182,16 +72,11 @@ public:
     friend bool set_equal(const setHashed& a, const setHashed& b);
 
 private:
-    struct Node {
-        int value;
-        Node* next;
-        Node(int v, Node* n = nullptr) : value(v), next(n) {}
-    };
-
     std::size_t N;
-    std::vector<Node*> buckets;
+    std::vector<std::vector<int>> buckets;
     std::size_t elementCount;
 
+    // Hash: bezpieczny dla liczb ujemnych (zawsze wynik 0..N-1).
     std::size_t hash(int x) const {
         long long v = x;
         long long mod = static_cast<long long>(N);
@@ -201,99 +86,65 @@ private:
     }
 };
 
+// Suma zbiorów: elementy z a lub b.
+// Robimy osobno na każdym kubełku, bo oba zbiory mają ten sam N i hash.
 setHashed set_union(const setHashed& a, const setHashed& b) {
     if (a.N != b.N) throw std::runtime_error("Bucket counts differ in set_union");
+    //tworzymy pusty bucket
     setHashed result(a.N);
 
     for (std::size_t i = 0; i < a.N; ++i) {
-        setHashed::Node* p = a.buckets[i];
-        setHashed::Node* q = b.buckets[i];
-        setHashed::Node** tail = &result.buckets[i];
+        const auto& A = a.buckets[i];
+        const auto& B = b.buckets[i];
+        auto& R = result.buckets[i];
 
-        while (p || q) {
-            int val;
-            if (!q || (p && p->value < q->value)) {
-                val = p->value;
-                p = p->next;
-            } else if (!p || (q && q->value < p->value)) {
-                val = q->value;
-                q = q->next;
-            } else {
-                val = p->value;
-                p = p->next;
-                q = q->next;
-            }
-            *tail = new setHashed::Node(val);
-            tail = &((*tail)->next);
-            ++result.elementCount;
-        }
+        R.reserve(A.size() + B.size());
+        //merguje 2 zbiory
+        std::set_union(A.begin(), A.end(), B.begin(), B.end(), std::back_inserter(R));
+        result.elementCount += R.size();
     }
     return result;
 }
 
+// Część wspólna: elementy, które są w a i w b.
 setHashed set_intersection(const setHashed& a, const setHashed& b) {
     if (a.N != b.N) throw std::runtime_error("Bucket counts differ in set_intersection");
     setHashed result(a.N);
 
     for (std::size_t i = 0; i < a.N; ++i) {
-        setHashed::Node* p = a.buckets[i];
-        setHashed::Node* q = b.buckets[i];
-        setHashed::Node** tail = &result.buckets[i];
+        const auto& A = a.buckets[i];
+        const auto& B = b.buckets[i];
+        auto& R = result.buckets[i];
 
-        while (p && q) {
-            if (p->value == q->value) {
-                *tail = new setHashed::Node(p->value);
-                tail = &((*tail)->next);
-                ++result.elementCount;
-                p = p->next;
-                q = q->next;
-            } else if (p->value < q->value) {
-                p = p->next;
-            } else {
-                q = q->next;
-            }
-        }
+        R.reserve(std::min(A.size(), B.size()));
+        std::set_intersection(A.begin(), A.end(), B.begin(), B.end(), std::back_inserter(R));
+        result.elementCount += R.size();
     }
     return result;
 }
 
+// Różnica: elementy, które są w a, ale nie ma ich w b.
 setHashed set_difference(const setHashed& a, const setHashed& b) {
     if (a.N != b.N) throw std::runtime_error("Bucket counts differ in set_difference");
     setHashed result(a.N);
 
     for (std::size_t i = 0; i < a.N; ++i) {
-        setHashed::Node* p = a.buckets[i];
-        setHashed::Node* q = b.buckets[i];
-        setHashed::Node** tail = &result.buckets[i];
+        const auto& A = a.buckets[i];
+        const auto& B = b.buckets[i];
+        auto& R = result.buckets[i];
 
-        while (p) {
-            while (q && q->value < p->value) q = q->next;
-            if (!q || q->value != p->value) {
-                *tail = new setHashed::Node(p->value);
-                tail = &((*tail)->next);
-                ++result.elementCount;
-            }
-            p = p->next;
-        }
+        R.reserve(A.size());
+        std::set_difference(A.begin(), A.end(), B.begin(), B.end(), std::back_inserter(R));
+        result.elementCount += R.size();
     }
     return result;
 }
 
+// Równość zbiorów: porównujemy rozmiar i zawartość kubełków.
 bool set_equal(const setHashed& a, const setHashed& b) {
     if (a.N != b.N) return false;
     if (a.elementCount != b.elementCount) return false;
-
-    for (std::size_t i = 0; i < a.N; ++i) {
-        setHashed::Node* p = a.buckets[i];
-        setHashed::Node* q = b.buckets[i];
-        while (p && q) {
-            if (p->value != q->value) return false;
-            p = p->next;
-            q = q->next;
-        }
-        if (p || q) return false;
-    }
-    return true;
+    return a.buckets == b.buckets;
 }
 
 static void simple_demo() {
@@ -310,9 +161,9 @@ static void simple_demo() {
     setHashed I = set_intersection(A, B);
     setHashed D = set_difference(A, B);
 
-    std::cout << "A \\(U\\) B = "; U.print(); std::cout << "\n";
-    std::cout << "A \\(I\\) B = "; I.print(); std::cout << "\n";
-    std::cout << "A \\\\ B = "; D.print(); std::cout << "\n";
+    std::cout << "A (U) B = "; U.print(); std::cout << "\n";
+    std::cout << "A (I) B = "; I.print(); std::cout << "\n";
+    std::cout << "A \\ B = "; D.print(); std::cout << "\n";
 
     std::cout << "contains 5 in A: " << (A.contains(5) ? "YES" : "NO") << "\n";
     std::cout << "contains 4 in A: " << (A.contains(4) ? "YES" : "NO") << "\n";
@@ -330,8 +181,8 @@ static void write_gnuplot_scripts(const std::filesystem::path& outDir) {
             << "set terminal pngcairo size 1200,800\n"
             << "set output 'insert.png'\n"
             << "set title 'Average time: insert'\n"
-            << "set xlabel 'n \\(elements\\)'\n"
-            << "set ylabel 'time \\(ns\\)'\n"
+            << "set xlabel 'n (elements)'\n"
+            << "set ylabel 'time (ns)'\n"
             << "set grid\n"
             << "plot 'insert.dat' using 1:2 with lines lw 2 title 'insert'\n";
     }
@@ -341,8 +192,8 @@ static void write_gnuplot_scripts(const std::filesystem::path& outDir) {
             << "set terminal pngcairo size 1200,800\n"
             << "set output 'contains.png'\n"
             << "set title 'Average time: contains'\n"
-            << "set xlabel 'n \\(elements\\)'\n"
-            << "set ylabel 'time \\(ns\\)'\n"
+            << "set xlabel 'n (elements)'\n"
+            << "set ylabel 'time (ns)'\n"
             << "set grid\n"
             << "plot 'contains.dat' using 1:2 with lines lw 2 title 'contains'\n";
     }
@@ -351,7 +202,7 @@ static void write_gnuplot_scripts(const std::filesystem::path& outDir) {
 static void benchmark_example() {
     namespace fs = std::filesystem;
 
-    const std::size_t BUCKETS = 1009; // prime, reduces clustering a bit
+    const std::size_t BUCKETS = 1009;
     const int nStart = 1000;
     const int nEnd = 20000;
     const int nStep = 1000;
@@ -365,7 +216,7 @@ static void benchmark_example() {
     fs::path outDir = fs::current_path() / "data";
     fs::create_directories(outDir);
 
-    // INSERT benchmark -> `data/insert.dat`
+    // INSERT benchmark -> data/insert.dat
     {
         std::ofstream out(outDir / "insert.dat");
         out << "# n avg_time_ns\n";
@@ -374,7 +225,6 @@ static void benchmark_example() {
             setHashed s(BUCKETS);
             for (int i = 0; i < n; ++i) s.insert(dist(rng));
 
-            // warmup
             for (int t = 0; t < warmup; ++t) {
                 int x = dist(rng);
                 s.insert(x);
@@ -397,7 +247,7 @@ static void benchmark_example() {
         }
     }
 
-    // CONTAINS benchmark -> `data/contains.dat`
+    // CONTAINS benchmark -> data/contains.dat
     {
         std::ofstream out(outDir / "contains.dat");
         out << "# n avg_time_ns\n";
@@ -413,7 +263,6 @@ static void benchmark_example() {
                 inserted.push_back(x);
             }
 
-            // warmup
             for (int t = 0; t < warmup; ++t) {
                 int x = (t % 2 == 0) ? inserted[static_cast<std::size_t>(t) % inserted.size()] : dist(rng);
                 volatile bool res = s.contains(x);
