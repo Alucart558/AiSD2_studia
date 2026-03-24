@@ -73,12 +73,14 @@ public:
 
     size_t getSize() const { return N; }
 
+    //mapuje liczby całkowite z przedziału [n, m] na indeksy [0, m-n].
     size_t mapIntegerRange(int x, int n, int m) const {
         if (n >= m) throw std::invalid_argument("mapIntegerRange: n must be < m");
         if (x < n || x > m) throw std::out_of_range("mapIntegerRange: integer out of [n, m]");
         return static_cast<size_t>(x - n);
     }
 
+    //mapuje ciąg n, n+2, n+4, ..., m na indeksy 0..k.
     size_t mapIntegerRangeStep2(int x, int n, int m) const {
         if (n >= m) throw std::invalid_argument("mapIntegerRangeStep2: n must be < m");
         if ((m - n) % 2 != 0) throw std::invalid_argument("mapIntegerRangeStep2: m and n must have the same parity");
@@ -88,11 +90,13 @@ public:
         return static_cast<size_t>((x - n) / 2);
     }
 
+    //mapuje literę 'a'..'z' na 0..25.
     size_t mapCharLetter(char c) const {
         if (c < 'a' || c > 'z') throw std::out_of_range("mapCharLetter: expected 'a'..'z'");
         return static_cast<size_t>(c - 'a');
     }
 
+    //mapuje napisy dwuliterowe "aa".."zz" na 0..675 (bo 26×26).
     size_t mapTwoLetterString(const std::string& str) const {
         if (str.length() != 2) throw std::out_of_range("mapTwoLetterString: string length must be 2");
         char c1 = str[0], c2 = str[1];

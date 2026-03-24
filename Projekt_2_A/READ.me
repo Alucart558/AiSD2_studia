@@ -37,9 +37,12 @@ cd "C:/Users/dawib/CLionProjects/Projekt0_AiSD2/Projekt_2_A"
           "dane.csv" using 1:6 with lines title "intersection us", \
           "dane.csv" using 1:7 with lines title "difference us"
 
-setUnion/setIntersection/setDifference return a whole SetSimple by value.
-Each call allocates and builds a new std::vector<bool> of size (N). That adds allocation + zero-fill/initialization cost which grows with (N) and can dominate the loop. It can look \“super-linear\” on a normal plot scale.
-You create volatile auto tmp = op();
-With volatile, the compiler must materialize the full returned object and may generate very pessimistic code. This makes things slower and noisier.
-insert() is not pure (O(1)) in your benchmark
-After the set gets filled, repeated inserts keep touching random bits across a huge vector<bool>, causing cache misses. It’s still (O(1)) algorithmically, but the constant factor increases with (N) due to memory hierarchy.
+W skrócie: algorytmicznie powinno być ~(O(N)) po liczbie bitów,
+ale benchmark mierzy też alokacje, inicjalizacje i
+narzuty pamięci/volatile, przez co krzywa wygląda
+jak (O(N^2)).
+
+setUnion/setIntersection/setDifference zwracają cały SetSimple.
+ To zwykle oznacza alokację i zbudowanie nowego std::vector<bool>
+  rozmiaru (N). Sama ta alokacja + inicjalizacja (wyzerowanie)
+  rośnie z (N) i potrafi dominować czas

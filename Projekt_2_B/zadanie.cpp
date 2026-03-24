@@ -23,6 +23,7 @@ public:
 
     ~setHashed() { clear(); }
 
+    //konstruktor kopiujacy
     setHashed(const setHashed& other)
         : N(other.N), buckets(other.N, nullptr), elementCount(0) {
         for (std::size_t i = 0; i < N; ++i) {
@@ -39,6 +40,7 @@ public:
         }
     }
 
+    //replace the current object’s contents with a deep copy of other.
     setHashed& operator=(const setHashed& other) {
         if (this == &other) return *this;
         clear();
@@ -69,6 +71,7 @@ public:
         // buckets moved; leave other in safe destructible state
     }
 
+    //transfer ownership of nodes from other to the new object *without copying*.
     setHashed& operator=(setHashed&& other) noexcept {
         if (this == &other) return *this;
         clear();
