@@ -1,0 +1,73 @@
+Kluczowe założenie: Rozmiar dziedziny (Uniwersum)
+
+Słowa składają się z 4 liter (bez polskich znaków, co daje nam standardowy alfabet 26 liter).
+Całkowita liczba możliwych 4-literowych słów (nasze uniwersum, oznaczmy je jako ∣Ω∣) wynosi:
+∣Ω∣=264=456 976
+
+Każde takie słowo można łatwo zmapować na unikalną liczbę całkowitą z przedziału od 0 do 456 975 (np. traktując słowo jako liczbę w systemie o podstawie 26).
+
+Oto szczegółowe porównanie implementacji w tym specyficznym kontekście.
+1. setSimple (Tablica jednowymiarowa / Bitset)
+
+Tworzymy tablicę wartości logicznych (np. bool) o rozmiarze N=456 976. Indeks w tablicy odpowiada unikalnemu numerowi słowa.
+
+    Złożoność czasowa:
+
+        Wstawianie, usuwanie, sprawdzanie (x∈A): O(1). Genialnie szybkie (bezpośredni dostęp do pamięci).
+
+        Operacje na zbiorach (Suma, Przecięcie, Różnica): O(∣Ω∣), czyli zawsze musimy wykonać 456 976 operacji, niezależnie od tego, czy zbiory są pełne, czy prawie puste.
+
+    Złożoność pamięciowa: Stała. Wymaga ok. 457 KB pamięci (lub tylko ok. 57 KB, jeśli użyjemy pojedynczych bitów - bitset).
+
+    Werdykt: W dzisiejszych czasach 457 KB to ułamek megabajta, więc pamięciowo ta struktura jest bardzo tania.
+
+Kiedy ta implementacja jest najlepsza?
+
+Gdy mamy do czynienia ze zbiorami gęstymi (zawierającymi dużo elementów) lub gdy kluczowa jest błyskawiczna weryfikacja czy element należy do zbioru (np. słownik dozwolonych haseł 4-literowych w grze słownej). Jest to też absolutnie najlepszy wybór, jeśli bardzo często modyfikujemy pojedyncze elementy.
+2. setLinked (Posortowana lista łączona)
+
+Przechowujemy tylko te słowa, które faktycznie dodaliśmy do zbioru, ułożone alfabetycznie (lub rosnąco po ich wartości liczbowej). Oznaczmy liczbę elementów w zbiorze jako k.
+
+    Złożoność czasowa:
+
+        Wstawianie, usuwanie, sprawdzanie (x∈A): O(k). W najgorszym razie musimy przejść całą listę.
+
+        Operacje na zbiorach (Suma, Przecięcie itp.): O(kA​+kB​). Dzięki temu, że listy są posortowane, łączymy je podobnie jak w fazie merge algorytmu MergeSort.
+
+    Złożoność pamięciowa: Dynamiczna, O(k). Zależy tylko od ilości wstawionych elementów. Dla każdego słowa musimy jednak przechowywać dodatkowy wskaźnik na następny element.
+
+Kiedy ta implementacja jest najlepsza?
+
+Gdy mamy do czynienia ze zbiorami rzadkimi (przechowujemy w nich zaledwie kilka-kilkanaście słów).
+Przykład: Zbiór przechowujący inicjały (4-literowe skróty) pracowników małego działu w firmie (np. 5 osób). Przejście przez 5-elementową listę jest w praktyce szybsze niż inicjalizacja tablicy na pół miliona elementów (setSimple). Wykonywanie sumy dwóch takich 5-elementowych zbiorów będzie natychmiastowe w porównaniu do iterowania przez 456 976 indeksów.
+3. setHashed (Tablica haszująca z listami dla kolizji)
+
+Rozwiązanie kompromisowe. Mamy tablicę N "kubełków" (gdzie N jest mniejsze niż całe uniwersum, np. N=1000). Funkcja xmodN decyduje, do którego kubełka trafi słowo. Każdy kubełek to króciutka posortowana lista łączona z zadania setLinked.
+
+    Złożoność czasowa:
+
+        Wstawianie, usuwanie, sprawdzanie (x∈A): Średnio O(1) (dokładniej O(1+k/N)). Jeśli funkcja haszująca dobrze rozkłada słowa, w kubełku będą 1 lub 2 elementy. W najgorszym przypadku (wszystkie słowa w jednym kubełku) degraduje się do O(k).
+
+        Operacje na zbiorach (Suma, Przecięcie): Zależą od implementacji, ale zazwyczaj są wolniejsze niż w setSimple (wymagają iterowania przez wszystkie kubełki i wszystkie elementy w nich).
+
+    Złożoność pamięciowa: O(N+k). Pamięć na tablicę kubełków plus węzły list łączonych.
+
+Kiedy ta implementacja jest najlepsza?
+
+Jest to tzw. "złoty środek" w ogólnym programowaniu, ale w tym specyficznym przypadku (tylko 4-literowe słowa) jest to zazwyczaj najgorszy wybór. Dlaczego?
+Ponieważ nasze uniwersum jest małe (tylko 456 976 możliwości).
+
+    Jeżeli zrobimy dużo kubełków (np. blisko 400 000), to pamięciowo i wydajnościowo będzie to gorsze niż setSimple (bo dochodzi narzut na wskaźniki i obliczanie hasza).
+
+    Jeżeli zrobimy mało kubełków (np. 100), to stworzymy długie listy łączone i stracimy zalety haszowania.
+
+Tę implementację warto wybrać tylko wtedy, gdy rozmiar dziedziny jest potężny lub nieskończony (np. słowa o dowolnej długości), a my chcemy mieć szybki czas dostępu do danych, nie marnując gigabajtów pamięci.
+Podsumowanie i werdykt końcowy
+
+Ze względu na ograniczenie dziedziny wyłącznie do słów 4-literowych:
+
+    Bezwzględnym zwycięzcą dla większości przypadków jest setSimple. Ze względu na bardzo mały rozmiar całkowity uniwersum (<0.5 MB), możemy sobie pozwolić na zaalokowanie całej tablicy. Dostajemy w zamian absolutnie najszybszy dostęp O(1) i brak problemów z kolizjami.
+
+    setLinked wygrywa tylko dla mikroskopijnych zbiorów (np. do kilkuset elementów).
+
+    setHashed w tym konkretnym zadaniu stanowi "przerost formy nad treścią", ponieważ nie mamy problemu ze zbyt dużą przestrzenią kluczy, który haszowanie miałoby rozwiązywać.

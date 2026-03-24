@@ -4,44 +4,25 @@
 #include <chrono>
 #include <fstream>
 #include <stdexcept>
-
-/*
- * setHashed – implementacja zbioru liczb całkowitych
- * --------------------------------------------------
- * - Zbiór jest reprezentowany jako tablica kubełków (bucketów).
- * - Każdy kubełek to POSORTOWANA lista jednokierunkowa, bez duplikatów.
- * - Funkcja haszująca: bucket(x) = x % N (zabezpieczone przed liczbami ujemnymi).
- *
- * Zaimplementowane operacje:
- *  - insert(x)        – wstawianie elementu do zbioru
- *  - erase(x)         – usuwanie elementu ze zbioru
- *  - contains(x)      – sprawdzenie, czy element należy do zbioru
- *  - clear()          – czyszczenie zbioru
- *  - size()           – liczba elementów w zbiorze
- *
- * Operacje na dwóch zbiorach (jako funkcje zaprzyjaźnione):
- *  - set_union(a,b)         – suma zbiorów
- *  - set_intersection(a,b)  – część wspólna
- *  - set_difference(a,b)    – różnica (a \ b)
- *  - set_equal(a,b)         – sprawdzenie identyczności zbiorów
- *
- * W funkcji main:
- *  - proste testy poprawności,
- *  - przykładowy pomiar czasu insert/contains i zapis plików .dat dla gnuplota.
- */
+#include <iostream>
+#include <vector>
+#include <random>
+#include <chrono>
+#include <fstream>
+#include <stdexcept>
+#include <filesystem>
+#include <string>
+#include <algorithm>
 
 class setHashed {
 public:
-    // Konstruktor – tworzy zbiór z daną liczbą kubełków
     explicit setHashed(std::size_t bucketCount)
-        : N(bucketCount), buckets(bucketCount, nullptr), elementCount(0) {}
-
-    // Destruktor – zwalnia pamięć
-    ~setHashed() {
-        clear();
+        : N(bucketCount), buckets(bucketCount, nullptr), elementCount(0) {
+        if (N == 0) throw std::invalid_argument("bucketCount must be > 0");
     }
 
-    // Konstruktor kopiujący – głębokie kopiowanie list w kubełkach
+    ~setHashed() { clear(); }
+
     setHashed(const setHashed& other)
         : N(other.N), buckets(other.N, nullptr), elementCount(0) {
         for (std::size_t i = 0; i < N; ++i) {
@@ -49,11 +30,8 @@ public:
             Node* prevNew = nullptr;
             while (p) {
                 Node* n = new Node(p->value);
-                if (!prevNew) {
-                    buckets[i] = n;
-                } else {
-                    prevNew->next = n;
-                }
+                if (!prevNew) buckets[i] = n;
+                else prevNew->next = n;
                 prevNew = n;
                 p = p->next;
                 ++elementCount;
@@ -61,7 +39,6 @@ public:
         }
     }
 
-    // Operator przypisania – głębokie kopiowanie
     setHashed& operator=(const setHashed& other) {
         if (this == &other) return *this;
         clear();
@@ -74,11 +51,8 @@ public:
             Node* prevNew = nullptr;
             while (p) {
                 Node* n = new Node(p->value);
-                if (!prevNew) {
-                    buckets[i] = n;
-                } else {
-                    prevNew->next = n;
-                }
+                if (!prevNew) buckets[i] = n;
+                else prevNew->next = n;
                 prevNew = n;
                 p = p->next;
                 ++elementCount;
@@ -87,55 +61,59 @@ public:
         return *this;
     }
 
-    // Wstawianie elementu x do zbioru
+    // Optional: move for efficiency in benchmarks
+    setHashed(setHashed&& other) noexcept
+        : N(other.N), buckets(std::move(other.buckets)), elementCount(other.elementCount) {
+        other.N = 0;
+        other.elementCount = 0;
+        // buckets moved; leave other in safe destructible state
+    }
+
+    setHashed& operator=(setHashed&& other) noexcept {
+        if (this == &other) return *this;
+        clear();
+        N = other.N;
+        buckets = std::move(other.buckets);
+        elementCount = other.elementCount;
+        other.N = 0;
+        other.elementCount = 0;
+        return *this;
+    }
+
     void insert(int x) {
         std::size_t idx = hash(x);
-        Node*& head = buckets[idx]; // referencja do wskaźnika na głowę listy
+        Node*& head = buckets[idx];
 
-        // kubełek pusty
         if (!head) {
             head = new Node(x);
             ++elementCount;
             return;
         }
 
-        // wstawianie przed pierwszy element
         if (x < head->value) {
-            Node* n = new Node(x, head);
-            head = n;
+            head = new Node(x, head);
             ++elementCount;
             return;
         }
-        // jeśli element już jest na początku – nic nie robimy
-        if (x == head->value) {
-            return;
-        }
+        if (x == head->value) return;
 
-        // szukamy miejsca w środku / na końcu listy
         Node* prev = head;
         Node* curr = head->next;
         while (curr && curr->value < x) {
             prev = curr;
             curr = curr->next;
         }
-        // jeżeli element już istnieje – nie duplikujemy
-        if (curr && curr->value == x) {
-            return;
-        }
-        // wstawiamy nowy węzeł pomiędzy prev a curr
-        Node* n = new Node(x, curr);
-        prev->next = n;
+        if (curr && curr->value == x) return;
+
+        prev->next = new Node(x, curr);
         ++elementCount;
     }
 
-    // Usuwanie elementu x ze zbioru (jeśli istnieje)
     void erase(int x) {
         std::size_t idx = hash(x);
         Node*& head = buckets[idx];
-
         if (!head) return;
 
-        // usunięcie elementu z początku listy
         if (head->value == x) {
             Node* tmp = head;
             head = head->next;
@@ -146,7 +124,6 @@ public:
 
         Node* prev = head;
         Node* curr = head->next;
-
         while (curr && curr->value < x) {
             prev = curr;
             curr = curr->next;
@@ -158,25 +135,18 @@ public:
         }
     }
 
-    // Sprawdzenie, czy x należy do zbioru
     bool contains(int x) const {
         std::size_t idx = hash(x);
         Node* curr = buckets[idx];
-
-        while (curr && curr->value < x) {
-            curr = curr->next;
-        }
+        while (curr && curr->value < x) curr = curr->next;
         return curr && curr->value == x;
     }
 
-    // Liczba elementów w zbiorze
-    std::size_t size() const {
-        return elementCount;
-    }
+    std::size_t size() const { return elementCount; }
 
-    // Wyczyszczenie zbioru (zwolnienie pamięci i ustawienie pustych kubełków)
     void clear() {
-        for (std::size_t i = 0; i < N; ++i) {
+        // If N==0 \(\) after move, nothing to do
+        for (std::size_t i = 0; i < buckets.size(); ++i) {
             Node* curr = buckets[i];
             while (curr) {
                 Node* tmp = curr;
@@ -188,11 +158,10 @@ public:
         elementCount = 0;
     }
 
-    // Proste wypisanie zawartości (do debugowania)
     void print(std::ostream& os = std::cout) const {
         os << "{ ";
         bool first = true;
-        for (std::size_t i = 0; i < N; ++i) {
+        for (std::size_t i = 0; i < buckets.size(); ++i) {
             Node* curr = buckets[i];
             while (curr) {
                 if (!first) os << ", ";
@@ -204,7 +173,6 @@ public:
         os << " }";
     }
 
-    // Funkcje zaprzyjaźnione – operacje na dwóch zbiorach
     friend setHashed set_union(const setHashed& a, const setHashed& b);
     friend setHashed set_intersection(const setHashed& a, const setHashed& b);
     friend setHashed set_difference(const setHashed& a, const setHashed& b);
@@ -217,11 +185,10 @@ private:
         Node(int v, Node* n = nullptr) : value(v), next(n) {}
     };
 
-    std::size_t N;               // liczba kubełków
-    std::vector<Node*> buckets;  // tablica kubełków
-    std::size_t elementCount;    // liczba elementów w zbiorze
+    std::size_t N;
+    std::vector<Node*> buckets;
+    std::size_t elementCount;
 
-    // Funkcja haszująca – wynik zawsze w [0, N-1]
     std::size_t hash(int x) const {
         long long v = x;
         long long mod = static_cast<long long>(N);
@@ -231,11 +198,8 @@ private:
     }
 };
 
-// SUMA zbiorów: A ∪ B
 setHashed set_union(const setHashed& a, const setHashed& b) {
-    if (a.N != b.N) {
-        throw std::runtime_error("Bucket counts differ in set_union");
-    }
+    if (a.N != b.N) throw std::runtime_error("Bucket counts differ in set_union");
     setHashed result(a.N);
 
     for (std::size_t i = 0; i < a.N; ++i) {
@@ -251,7 +215,7 @@ setHashed set_union(const setHashed& a, const setHashed& b) {
             } else if (!p || (q && q->value < p->value)) {
                 val = q->value;
                 q = q->next;
-            } else { // p->value == q->value
+            } else {
                 val = p->value;
                 p = p->next;
                 q = q->next;
@@ -264,11 +228,8 @@ setHashed set_union(const setHashed& a, const setHashed& b) {
     return result;
 }
 
-// CZĘŚĆ WSPÓLNA: A ∩ B
 setHashed set_intersection(const setHashed& a, const setHashed& b) {
-    if (a.N != b.N) {
-        throw std::runtime_error("Bucket counts differ in set_intersection");
-    }
+    if (a.N != b.N) throw std::runtime_error("Bucket counts differ in set_intersection");
     setHashed result(a.N);
 
     for (std::size_t i = 0; i < a.N; ++i) {
@@ -293,11 +254,8 @@ setHashed set_intersection(const setHashed& a, const setHashed& b) {
     return result;
 }
 
-// RÓŻNICA: A \ B
 setHashed set_difference(const setHashed& a, const setHashed& b) {
-    if (a.N != b.N) {
-        throw std::runtime_error("Bucket counts differ in set_difference");
-    }
+    if (a.N != b.N) throw std::runtime_error("Bucket counts differ in set_difference");
     setHashed result(a.N);
 
     for (std::size_t i = 0; i < a.N; ++i) {
@@ -306,9 +264,7 @@ setHashed set_difference(const setHashed& a, const setHashed& b) {
         setHashed::Node** tail = &result.buckets[i];
 
         while (p) {
-            while (q && q->value < p->value) {
-                q = q->next;
-            }
+            while (q && q->value < p->value) q = q->next;
             if (!q || q->value != p->value) {
                 *tail = new setHashed::Node(p->value);
                 tail = &((*tail)->next);
@@ -320,7 +276,6 @@ setHashed set_difference(const setHashed& a, const setHashed& b) {
     return result;
 }
 
-// SPRAWDZANIE IDENTYCZNOŚCI ZBIORÓW
 bool set_equal(const setHashed& a, const setHashed& b) {
     if (a.N != b.N) return false;
     if (a.elementCount != b.elementCount) return false;
@@ -333,32 +288,17 @@ bool set_equal(const setHashed& a, const setHashed& b) {
             p = p->next;
             q = q->next;
         }
-        if (p || q) return false; // różna długość listy w kubełku
+        if (p || q) return false;
     }
     return true;
 }
 
-/*
- * Funkcja pomocnicza: prosty test poprawności operacji na zbiorach.
- */
-void simple_demo() {
+static void simple_demo() {
     const std::size_t BUCKETS = 7;
-    setHashed A(BUCKETS);
-    setHashed B(BUCKETS);
+    setHashed A(BUCKETS), B(BUCKETS);
 
-    // A = {1, 2, 5, 10, 20}
-    A.insert(1);
-    A.insert(2);
-    A.insert(5);
-    A.insert(10);
-    A.insert(20);
-
-    // B = {2, 3, 5, 7, 20}
-    B.insert(2);
-    B.insert(3);
-    B.insert(5);
-    B.insert(7);
-    B.insert(20);
+    A.insert(1); A.insert(2); A.insert(5); A.insert(10); A.insert(20);
+    B.insert(2); B.insert(3); B.insert(5); B.insert(7);  B.insert(20);
 
     std::cout << "A = "; A.print(); std::cout << "\n";
     std::cout << "B = "; B.print(); std::cout << "\n";
@@ -367,51 +307,84 @@ void simple_demo() {
     setHashed I = set_intersection(A, B);
     setHashed D = set_difference(A, B);
 
-    std::cout << "A ∪ B = "; U.print(); std::cout << "\n";
-    std::cout << "A ∩ B = "; I.print(); std::cout << "\n";
-    std::cout << "A \\ B = "; D.print(); std::cout << "\n";
+    std::cout << "A \\(U\\) B = "; U.print(); std::cout << "\n";
+    std::cout << "A \\(I\\) B = "; I.print(); std::cout << "\n";
+    std::cout << "A \\\\ B = "; D.print(); std::cout << "\n";
 
-    std::cout << "contains 5 in A: " << (A.contains(5) ? "TAK" : "NIE") << "\n";
-    std::cout << "contains 4 in A: " << (A.contains(4) ? "TAK" : "NIE") << "\n";
+    std::cout << "contains 5 in A: " << (A.contains(5) ? "YES" : "NO") << "\n";
+    std::cout << "contains 4 in A: " << (A.contains(4) ? "YES" : "NO") << "\n";
 
     setHashed C = A;
-    std::cout << "C = A, set_equal(A, C) = " << (set_equal(A, C) ? "TAK" : "NIE") << "\n";
+    std::cout << "C = A, set_equal(A, C) = " << (set_equal(A, C) ? "YES" : "NO") << "\n";
     C.erase(1);
-    std::cout << "Po usunieciu 1 z C: set_equal(A, C) = " << (set_equal(A, C) ? "TAK" : "NIE") << "\n";
+    std::cout << "After erase 1 from C: set_equal(A, C) = " << (set_equal(A, C) ? "YES" : "NO") << "\n";
 }
 
-/*
- * Funkcja pomocnicza: zapisuje dane (n, średni czas) dla insert i contains
- * do plików insert.dat oraz contains.dat – można potem użyć w gnuplocie.
- */
-void benchmark_example() {
-    const std::size_t BUCKETS = 101; // np. liczba pierwsza
+static void write_gnuplot_scripts(const std::filesystem::path& outDir) {
+    {
+        std::ofstream gp(outDir / "insert.gp");
+        gp
+            << "set terminal pngcairo size 1200,800\n"
+            << "set output 'insert.png'\n"
+            << "set title 'Average time: insert'\n"
+            << "set xlabel 'n \\(elements\\)'\n"
+            << "set ylabel 'time \\(ns\\)'\n"
+            << "set grid\n"
+            << "plot 'insert.dat' using 1:2 with lines lw 2 title 'insert'\n";
+    }
+    {
+        std::ofstream gp(outDir / "contains.gp");
+        gp
+            << "set terminal pngcairo size 1200,800\n"
+            << "set output 'contains.png'\n"
+            << "set title 'Average time: contains'\n"
+            << "set xlabel 'n \\(elements\\)'\n"
+            << "set ylabel 'time \\(ns\\)'\n"
+            << "set grid\n"
+            << "plot 'contains.dat' using 1:2 with lines lw 2 title 'contains'\n";
+    }
+}
+
+static void benchmark_example() {
+    namespace fs = std::filesystem;
+
+    const std::size_t BUCKETS = 1009; // prime, reduces clustering a bit
+    const int nStart = 1000;
+    const int nEnd = 20000;
+    const int nStep = 1000;
+
+    const int trials = 2000;
+    const int warmup = 200;
 
     std::mt19937 rng(123456);
     std::uniform_int_distribution<int> dist(0, 1000000000);
 
-    // Pomiar insert
+    fs::path outDir = fs::current_path() / "data";
+    fs::create_directories(outDir);
+
+    // INSERT benchmark -> `data/insert.dat`
     {
-        std::ofstream out("insert.dat");
+        std::ofstream out(outDir / "insert.dat");
         out << "# n avg_time_ns\n";
 
-        for (int n = 1000; n <= 20000; n += 1000) {
+        for (int n = nStart; n <= nEnd; n += nStep) {
             setHashed s(BUCKETS);
+            for (int i = 0; i < n; ++i) s.insert(dist(rng));
 
-            // wypełniamy zbiór n elementami
-            for (int i = 0; i < n; ++i) {
-                s.insert(dist(rng));
+            // warmup
+            for (int t = 0; t < warmup; ++t) {
+                int x = dist(rng);
+                s.insert(x);
+                s.erase(x);
             }
 
-            const int trials = 1000;
             long long totalNs = 0;
-
             for (int t = 0; t < trials; ++t) {
                 int x = dist(rng);
-                auto start = std::chrono::high_resolution_clock::now();
-                s.insert(x);   // mierzona operacja
-                auto end = std::chrono::high_resolution_clock::now();
-                s.erase(x);    // usuwamy, by nie zmieniać zbytnio rozmiaru
+                auto start = std::chrono::steady_clock::now();
+                s.insert(x);
+                auto end = std::chrono::steady_clock::now();
+                s.erase(x);
                 totalNs += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
             }
 
@@ -421,15 +394,15 @@ void benchmark_example() {
         }
     }
 
-    // Pomiar contains
+    // CONTAINS benchmark -> `data/contains.dat`
     {
-        std::ofstream out("contains.dat");
+        std::ofstream out(outDir / "contains.dat");
         out << "# n avg_time_ns\n";
 
-        for (int n = 1000; n <= 20000; n += 1000) {
+        for (int n = nStart; n <= nEnd; n += nStep) {
             setHashed s(BUCKETS);
             std::vector<int> inserted;
-            inserted.reserve(n);
+            inserted.reserve(static_cast<std::size_t>(n));
 
             for (int i = 0; i < n; ++i) {
                 int x = dist(rng);
@@ -437,22 +410,24 @@ void benchmark_example() {
                 inserted.push_back(x);
             }
 
-            const int trials = 1000;
-            long long totalNs = 0;
-
-            for (int t = 0; t < trials; ++t) {
-                int x;
-                // co druga próba – element istniejący, co druga – losowy
-                if (t % 2 == 0) {
-                    x = inserted[t % inserted.size()];
-                } else {
-                    x = dist(rng);
-                }
-
-                auto start = std::chrono::high_resolution_clock::now();
-                volatile bool res = s.contains(x); // volatile, żeby kompilator nie wyciął
+            // warmup
+            for (int t = 0; t < warmup; ++t) {
+                int x = (t % 2 == 0) ? inserted[static_cast<std::size_t>(t) % inserted.size()] : dist(rng);
+                volatile bool res = s.contains(x);
                 (void)res;
-                auto end = std::chrono::high_resolution_clock::now();
+            }
+
+            long long totalNs = 0;
+            for (int t = 0; t < trials; ++t) {
+                int x = (t % 2 == 0)
+                            ? inserted[static_cast<std::size_t>(t) % inserted.size()]
+                            : dist(rng);
+
+                auto start = std::chrono::steady_clock::now();
+                volatile bool res = s.contains(x);
+                (void)res;
+                auto end = std::chrono::steady_clock::now();
+
                 totalNs += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
             }
 
@@ -461,19 +436,25 @@ void benchmark_example() {
             std::cout << "[contains] n=" << n << " avg=" << avgNs << " ns\n";
         }
     }
+
+    write_gnuplot_scripts(outDir);
+
+    std::cout << "\nSaved:\n";
+    std::cout << "  " << (outDir / "insert.dat").string() << "\n";
+    std::cout << "  " << (outDir / "contains.dat").string() << "\n";
+    std::cout << "  " << (outDir / "insert.gp").string() << "\n";
+    std::cout << "  " << (outDir / "contains.gp").string() << "\n";
 }
 
 int main() {
-    std::cout << "DEMO dzialania zbioru haszowanego:\n";
+    std::cout << "Demo of hashed set:\n";
     simple_demo();
 
-    std::cout << "\nUruchamiam przykladowy benchmark (insert, contains)...\n";
+    std::cout << "\nRunning benchmark and generating gnuplot data...\n";
     benchmark_example();
 
-    std::cout << "\nWygenerowano pliki: insert.dat oraz contains.dat (w katalogu z programem).\n";
-    std::cout << "Mozesz je otworzyc w gnuplocie, np.:\n";
-    std::cout << "  plot 'insert.dat' using 1:2 with lines title 'insert'\n";
-    std::cout << "  plot 'contains.dat' using 1:2 with lines title 'contains'\n";
-
+    std::cout << "\nTo generate PNG charts with gnuplot, run in `data/`:\n";
+    std::cout << "  gnuplot insert.gp\n";
+    std::cout << "  gnuplot contains.gp\n";
     return 0;
 }

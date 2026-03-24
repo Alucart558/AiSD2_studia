@@ -1,0 +1,43 @@
+# Projekt 2B \- setHashed \(\) + benchmark + gnuplot
+
+cd "C:/Users/dawib/CLionProjects/Projekt0_AiSD2/Projekt_2_B/data"
+
+## Opis
+Program implementuje zbiór liczb całkowitych jako tablicę kubełków \(\) z haszowaniem:
+- kubełki: posortowane listy jednokierunkowe bez duplikatów
+- hash: `bucket(x) = x % N` \(\) z obsługą liczb ujemnych
+
+Zaimplementowane:
+- `insert`, `erase`, `contains`, `clear`, `size`
+- operacje zbiorowe: `set_union`, `set_intersection`, `set_difference`, `set_equal`
+- benchmark tworzący dane do wykresów dla `insert` i `contains`
+
+## Pliki wyjściowe do wykresów
+Po uruchomieniu programu tworzy się katalog `data/` z plikami:
+- `data/insert.dat` \- dane do wykresu insert
+- `data/contains.dat` \- dane do wykresu contains
+- `data/insert.gp` \- skrypt gnuplota generujący `insert.png`
+- `data/contains.gp` \- skrypt gnuplota generujący `contains.png`
+
+Format `\*.dat`:
+- kolumna 1: `n` \- liczba elementów w zbiorze
+- kolumna 2: średni czas operacji w ns
+
+## Uruchomienie w CLion \(\) Windows
+1. Zbuduj i uruchom konfigurację z `zadanie.cpp`.
+2. Po wykonaniu programu sprawdź katalog roboczy \(\) powinien pojawić się folder `data/`.
+
+## Gnuplot \(\) generowanie wykresów
+W terminalu przejdź do katalogu `data/` i uruchom:
+- `gnuplot insert.gp`
+- `gnuplot contains.gp`
+
+Wyniki:
+- `data/insert.png`
+- `data/contains.png`
+
+## Uwagi benchmarku
+- Używany jest `std::chrono::steady_clock`
+- Jest faza warmup, żeby ograniczyć wpływ pierwszych wywołań
+- `contains` używa `volatile`, żeby kompilator nie usunął wywołań
+- Parametry benchmarku są w `benchmark_example()` \(\) m\.\ in\. zakres `n`, liczba `trials`, liczba kubełków `BUCKETS`
