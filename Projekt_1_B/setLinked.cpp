@@ -1,107 +1,190 @@
 #include <iostream>
-#include <memory>
 #include <chrono>
 #include <random>
 #include <iomanip>
+#include <memory>
+#include <string>
+
+// =====================
+// setLinked (unique_ptr)
+// =====================
 
 class Node {
 public:
     int value;
-    std::shared_ptr<Node> next;
+    std::unique_ptr<Node> next;
 
-    Node(int val) : value(val), next(nullptr) {}
+    explicit Node(int val) : value(val), next(nullptr) {}
 };
 
 class setLinked {
 private:
-    std::shared_ptr<Node> head;
+    std::unique_ptr<Node> head;
 
 public:
     setLinked() : head(nullptr) {}
 
-    // Wstawia element do zbioru w porzadku rosnacym, bez duplikatow
     void insert(int value) {
-        auto newNode = std::make_shared<Node>(value);
-
-        // Wstawienie na poczatek
+        // insert at head
         if (!head || head->value > value) {
             if (!head || head->value != value) {
-                newNode->next = head;
-                head = newNode;
+                auto newNode = std::make_unique<Node>(value);
+                newNode->next = std::move(head);
+                head = std::move(newNode);
             }
             return;
         }
 
-        auto current = head;
+        Node* current = head.get();
         while (current->next && current->next->value < value) {
-            current = current->next;
+            current = current->next.get();
         }
 
-        // Jesli nie ma duplikatu, wstawiamy
         if (!current->next || current->next->value != value) {
-            newNode->next = current->next;
-            current->next = newNode;
+            auto newNode = std::make_unique<Node>(value);
+            newNode->next = std::move(current->next);
+            current->next = std::move(newNode);
         }
     }
 
-    // Usuwa element ze zbioru
     void remove(int value) {
         if (!head) return;
 
         if (head->value == value) {
-            head = head->next;
+            head = std::move(head->next);
             return;
         }
 
-        auto current = head;
+        Node* current = head.get();
         while (current->next && current->next->value != value) {
-            current = current->next;
+            current = current->next.get();
         }
 
         if (current->next) {
-            current->next = current->next->next;
+            current->next = std::move(current->next->next);
         }
     }
 
-    // Sprawdza, czy element jest w zbiorze
     bool contains(int value) const {
-        auto current = head;
+        const Node* current = head.get();
         while (current) {
             if (current->value == value) return true;
-            current = current->next;
+            current = current->next.get();
         }
         return false;
     }
 
-    // Wypisuje elementy zbioru
     void print() const {
         std::cout << "{ ";
-        auto current = head;
+        const Node* current = head.get();
         while (current) {
             std::cout << current->value << " ";
-            current = current->next;
+            current = current->next.get();
         }
         std::cout << "}" << std::endl;
     }
 
-    // Zwraca rozmiar (liczbe elementow) zbioru
     int size() const {
         int count = 0;
-        auto current = head;
+        const Node* current = head.get();
         while (current) {
             ++count;
-            current = current->next;
+            current = current->next.get();
         }
         return count;
     }
 
-    // Czyści zbiór
     void clear() {
-        head.reset();
+        // iterative clear (also avoids deep recursion)
+        while (head) {
+            head = std::move(head->next);
+        }
+    }
+
+    // =====================
+    // Set operations
+    // =====================
+
+    setLinked setUnion(const setLinked& other) const {
+        setLinked result;
+        const Node* a = head.get();
+        const Node* b = other.head.get();
+
+        while (a || b) {
+            if (!b || (a && a->value < b->value)) {
+                result.insert(a->value);
+                a = a->next.get();
+            } else if (!a || (b && b->value < a->value)) {
+                result.insert(b->value);
+                b = b->next.get();
+            } else { // equal
+                result.insert(a->value);
+                a = a->next.get();
+                b = b->next.get();
+            }
+        }
+        return result;
+    }
+
+    setLinked setIntersection(const setLinked& other) const {
+        setLinked result;
+        const Node* a = head.get();
+        const Node* b = other.head.get();
+
+        while (a && b) {
+            if (a->value < b->value) {
+                a = a->next.get();
+            } else if (b->value < a->value) {
+                b = b->next.get();
+            } else {
+                result.insert(a->value);
+                a = a->next.get();
+                b = b->next.get();
+            }
+        }
+        return result;
+    }
+
+    setLinked setDifference(const setLinked& other) const {
+        // elements in *this that are not in other
+        setLinked result;
+        const Node* a = head.get();
+        const Node* b = other.head.get();
+
+        while (a) {
+            while (b && b->value < a->value) {
+                b = b->next.get();
+            }
+            if (!b || a->value < b->value) {
+                result.insert(a->value);
+                a = a->next.get();
+            } else { // equal -> skip
+                a = a->next.get();
+            }
+        }
+        return result;
+    }
+
+    bool equals(const setLinked& other) const {
+        const Node* a = head.get();
+        const Node* b = other.head.get();
+
+        while (a && b) {
+            if (a->value != b->value) return false;
+            a = a->next.get();
+            b = b->next.get();
+        }
+        return a == nullptr && b == nullptr;
     }
 };
 
-// --- Testy poprawności ---
+// =====================
+// Correctness tests
+// =====================
+
+static void assertTrue(bool cond, const std::string& name) {
+    std::cout << (cond ? "[OK]  " : "[FAIL] ") << name << std::endl;
+}
 
 void runCorrectnessTests() {
     std::cout << "=== TESTY POPRAWNOSCI setLinked ===" << std::endl;
@@ -111,7 +194,7 @@ void runCorrectnessTests() {
     mySet.insert(5);
     mySet.insert(3);
     mySet.insert(8);
-    mySet.insert(3); // duplikat, nie powinien zostac dodany
+    mySet.insert(3);
 
     std::cout << "Zbior po wstawieniach: ";
     mySet.print();
@@ -127,84 +210,155 @@ void runCorrectnessTests() {
     std::cout << "===============================\n" << std::endl;
 }
 
-// --- Badanie złożoności ---
+void runSetOpsCorrectnessTests() {
+    std::cout << "=== TESTY POPRAWNOSCI OPERACJI ZBIOROWYCH setLinked ===" << std::endl;
+
+    setLinked A;
+    for (int v : {1, 3, 5, 7, 9}) A.insert(v);
+
+    setLinked B;
+    for (int v : {2, 3, 5, 8}) B.insert(v);
+
+    setLinked U = A.setUnion(B);          // {1,2,3,5,7,8,9}
+    setLinked I = A.setIntersection(B);   // {3,5}
+    setLinked D = A.setDifference(B);     // {1,7,9}
+
+    assertTrue(U.size() == 7, "Union size");
+    assertTrue(U.contains(1) && U.contains(2) && U.contains(3) && U.contains(5) && U.contains(7) && U.contains(8) && U.contains(9),
+               "Union contents");
+
+    assertTrue(I.size() == 2, "Intersection size");
+    assertTrue(I.contains(3) && I.contains(5) && !I.contains(1) && !I.contains(2), "Intersection contents");
+
+    assertTrue(D.size() == 3, "Difference size");
+    assertTrue(D.contains(1) && D.contains(7) && D.contains(9) && !D.contains(3) && !D.contains(5), "Difference contents");
+
+    setLinked A2;
+    for (int v : {9, 7, 5, 3, 1}) A2.insert(v); // different insertion order, same final set
+    assertTrue(A.equals(A2), "Equals (same elements)");
+    assertTrue(!A.equals(B), "Equals (different sets)");
+
+    setLinked E1, E2;
+    assertTrue(E1.equals(E2), "Equals (both empty)");
+    E1.insert(1);
+    assertTrue(!E1.equals(E2), "Equals (one empty)");
+
+    std::cout << "===============================================\n" << std::endl;
+}
+
+// =====================
+// Benchmarks
+// =====================
+
+static setLinked makeRandomSet(int N, int range, std::mt19937& gen) {
+    setLinked s;
+    std::uniform_int_distribution<> dis(0, range);
+    for (int i = 0; i < N; ++i) s.insert(dis(gen));
+    return s;
+}
 
 void measureLinkedComplexity(int N) {
     using namespace std::chrono;
 
-    setLinked s;
+    // keep ops moderate so it finishes; adjust if needed
+    const int ops = 20000;
 
-    // Generujemy liczby w zakresie [0, 2N), czesc sie powtorzy
+    setLinked s;
     std::mt19937 gen(42);
     std::uniform_int_distribution<> dis(0, 2 * N);
 
-    // Wstepnie wstawiamy N elementow
     for (int i = 0; i < N; ++i) {
         s.insert(dis(gen));
     }
 
-    int ops = 10000; // liczba prob dla sredniej
-
-    // 1. Insert
     auto start = high_resolution_clock::now();
-    for (int i = 0; i < ops; ++i) {
-        s.insert(dis(gen));
-    }
+    for (int i = 0; i < ops; ++i) s.insert(dis(gen));
     auto end = high_resolution_clock::now();
-    double timeInsert = duration<double, std::micro>(end - start).count() / ops;
+    double insert_us = duration<double, std::micro>(end - start).count() / ops;
 
-    // 2. Contains
     start = high_resolution_clock::now();
-    for (int i = 0; i < ops; ++i) {
-        s.contains(dis(gen));
-    }
+    for (int i = 0; i < ops; ++i) s.contains(dis(gen));
     end = high_resolution_clock::now();
-    double timeContains = duration<double, std::micro>(end - start).count() / ops;
+    double contains_us = duration<double, std::micro>(end - start).count() / ops;
 
-    // 3. Remove
     start = high_resolution_clock::now();
-    for (int i = 0; i < ops; ++i) {
-        s.remove(dis(gen));
-    }
+    for (int i = 0; i < ops; ++i) s.remove(dis(gen));
     end = high_resolution_clock::now();
-    double timeRemove = duration<double, std::micro>(end - start).count() / ops;
+    double remove_us = duration<double, std::micro>(end - start).count() / ops;
 
-    // Wyniki w formacie przyjaznym gnuplotowi
-    std::cout << std::setw(10) << N
-              << std::setw(20) << timeInsert
-              << std::setw(20) << timeContains
-              << std::setw(20) << timeRemove << std::endl;
+    // gnuplot-friendly row
+    std::cout << N << " " << insert_us << " " << contains_us << " " << remove_us << "\n";
 }
 
 void runLinkedBenchmarks() {
     std::cout << "=== BADANIE ZLOZONOSCI setLinked (lista jednokierunkowa) ===" << std::endl;
-    std::cout << "Podejscie: dla roznych N (liczba elementow w zbiorze) mierzymy sredni czas\n";
-    std::cout << "operacji insert/contains/remove. Kazda operacja jest liniowa (O(n)),\n";
-    std::cout << "bo trzeba przejsc liste od poczatku do miejsca wstawienia/znalezienia.\n\n";
+    std::cout << "# N insert_us contains_us remove_us\n";
 
-    std::cout << std::setw(10) << "N"
-              << std::setw(20) << "Insert[us]"
-              << std::setw(20) << "Contains[us]"
-              << std::setw(20) << "Remove[us]" << std::endl;
-    std::cout << std::string(70, '-') << std::endl;
+    // many points for gnuplot (no need to touch main)
+    for (int N = 10; N <= 200; N += 5) {
+        measureLinkedComplexity(N);
+    }
+    for (int N = 200; N <= 50000; N = static_cast<int>(N * 1.05) + 1) {
+        measureLinkedComplexity(N);
+    }
+}
 
-    measureLinkedComplexity(1000);
-    measureLinkedComplexity(2000);
-    measureLinkedComplexity(5000);
-    measureLinkedComplexity(10000);
-    measureLinkedComplexity(20000);
+void runSetOpsBenchmarks() {
+    using namespace std::chrono;
 
-    std::cout << "\nWNIOSKI:" << std::endl;
-    std::cout << "Czasy insert/contains/remove rosna mniej wiecej liniowo z N," << std::endl;
-    std::cout << "co jest zgodne z teoretyczna zlozonoscia O(n) dla listy jednokierunkowej." << std::endl;
+    std::cout << "=== BADANIE ZLOZONOSCI OPERACJI ZBIOROWYCH setLinked ===" << std::endl;
+    std::cout << "# N union_us intersection_us difference_us equals_us\n";
+
+    std::mt19937 gen(123);
+
+    for (int N = 10; N <= 50000; N = static_cast<int>(N * 1.08) + 1) {
+        // build two sets of size ~N (unique count depends on collisions)
+        setLinked A = makeRandomSet(N, 2 * N, gen);
+        setLinked B = makeRandomSet(N, 2 * N, gen);
+
+        const int reps = 200; // keep runtime reasonable
+
+        auto t0 = high_resolution_clock::now();
+        for (int i = 0; i < reps; ++i) {
+            volatile int sz = A.setUnion(B).size();
+            (void)sz;
+        }
+        auto t1 = high_resolution_clock::now();
+
+        for (int i = 0; i < reps; ++i) {
+            volatile int sz = A.setIntersection(B).size();
+            (void)sz;
+        }
+        auto t2 = high_resolution_clock::now();
+
+        for (int i = 0; i < reps; ++i) {
+            volatile int sz = A.setDifference(B).size();
+            (void)sz;
+        }
+        auto t3 = high_resolution_clock::now();
+
+        for (int i = 0; i < reps; ++i) {
+            volatile bool eq = A.equals(B);
+            (void)eq;
+        }
+        auto t4 = high_resolution_clock::now();
+
+        double union_us = duration<double, std::micro>(t1 - t0).count() / reps;
+        double inter_us = duration<double, std::micro>(t2 - t1).count() / reps;
+        double diff_us  = duration<double, std::micro>(t3 - t2).count() / reps;
+        double eq_us    = duration<double, std::micro>(t4 - t3).count() / reps;
+
+        std::cout << N << " " << union_us << " " << inter_us << " " << diff_us << " " << eq_us << "\n";
+    }
+
+    std::cout << std::endl;
 }
 
 int main() {
-    // Testy poprawnosci dzialania operacji
     runCorrectnessTests();
+    runSetOpsCorrectnessTests();
 
-    // Analiza zlozonosci obliczeniowej
     runLinkedBenchmarks();
-
+    runSetOpsBenchmarks();
     return 0;
 }

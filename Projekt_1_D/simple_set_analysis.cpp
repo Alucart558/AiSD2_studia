@@ -7,17 +7,15 @@
 
 class SimpleSet {
 private:
-    std::vector<std::string> elements; // Jednowymiarowa tablica przechowująca ciągi znaków
+    std::vector<std::string> elements;
 
 public:
-    // Wstawianie do zbioru (bez duplikatow)
     void insert(const std::string& str) {
         if (std::find(elements.begin(), elements.end(), str) == elements.end()) {
             elements.push_back(str);
         }
     }
 
-    // Usuwanie ze zbioru
     void remove(const std::string& str) {
         auto it = std::find(elements.begin(), elements.end(), str);
         if (it != elements.end()) {
@@ -25,38 +23,25 @@ public:
         }
     }
 
-    // Sprawdzanie czy element należy do zbioru
     bool contains(const std::string& str) const {
         return std::find(elements.begin(), elements.end(), str) != elements.end();
     }
 
-    // Wypisywanie elementów zbioru (pomocnicza metoda)
     void print() const {
         std::cout << "{ ";
-        for (const auto& el : elements) {
-            std::cout << el << " ";
-        }
-        std::cout << "}" << std::endl;
+        for (const auto& el : elements) std::cout << el << " ";
+        std::cout << "}\n";
     }
 
-    // Rozmiar zbioru
-    std::size_t size() const {
-        return elements.size();
-    }
-
-    // Czyszczenie zbioru
-    void clear() {
-        elements.clear();
-    }
+    std::size_t size() const { return elements.size(); }
+    void clear() { elements.clear(); }
 };
 
-// Analiza złożoności dla pojedynczego N
-void analyzeComplexityForN(int numTests) {
+static void analyzeComplexityForN(int numTests) {
     using namespace std::chrono;
 
     SimpleSet set;
 
-    // Wstawianie elementów
     auto start = high_resolution_clock::now();
     for (int i = 0; i < numTests; ++i) {
         set.insert("element" + std::to_string(i));
@@ -64,7 +49,6 @@ void analyzeComplexityForN(int numTests) {
     auto end = high_resolution_clock::now();
     double insertMs = duration<double, std::milli>(end - start).count();
 
-    // Sprawdzanie elementów
     start = high_resolution_clock::now();
     for (int i = 0; i < numTests; ++i) {
         set.contains("element" + std::to_string(i));
@@ -72,7 +56,6 @@ void analyzeComplexityForN(int numTests) {
     end = high_resolution_clock::now();
     double containsMs = duration<double, std::milli>(end - start).count();
 
-    // Usuwanie elementów
     start = high_resolution_clock::now();
     for (int i = 0; i < numTests; ++i) {
         set.remove("element" + std::to_string(i));
@@ -80,59 +63,46 @@ void analyzeComplexityForN(int numTests) {
     end = high_resolution_clock::now();
     double removeMs = duration<double, std::milli>(end - start).count();
 
-    // Dane w formacie pod gnuplot: N insert[ms] contains[ms] remove[ms]
-    std::cout << std::setw(10) << numTests
-              << std::setw(15) << insertMs
-              << std::setw(15) << containsMs
-              << std::setw(15) << removeMs << std::endl;
+    // Plain gnuplot-friendly output: N insert_ms contains_ms remove_ms
+    std::cout << numTests << " " << std::fixed << std::setprecision(6)
+              << insertMs << " " << containsMs << " " << removeMs << "\n";
 }
 
-// Analiza złożoności dla kilku N
-void analyzeComplexity() {
-    std::cout << "=== BADANIE ZLOZONOSCI SimpleSet (vector<string>) ===" << std::endl;
-    std::cout << "Struktura danych: wektor lancuchow, operacje korzystaja z std::find.\n";
-    std::cout << "Kazda pojedyncza operacja insert/contains/remove jest liniowa O(n).\n";
-    std::cout << "Przy wykonywaniu numTests operacji, calkowity czas jest z grubsza O(n^2).\n\n";
+static void analyzeComplexityManyPoints() {
+    // Many points for gnuplot: adjust as needed.
+    // Tip: avoid too huge end/step, because this implementation is ~O(N^2).
+    const int startN = 200;
+    const int endN   = 50000;
+    const int stepN  = 200;
 
-    std::cout << std::setw(10) << "N"
-              << std::setw(15) << "insert[ms]"
-              << std::setw(15) << "contains[ms]"
-              << std::setw(15) << "remove[ms]" << std::endl;
-    std::cout << std::string(55, '-') << std::endl;
+    std::cout << "# SimpleSet(vector<string>) benchmark\n";
+    std::cout << "# columns: N insert_ms contains_ms remove_ms\n";
+    std::cout << "# range: " << startN << " .. " << endN << ", step " << stepN << "\n";
 
-    analyzeComplexityForN(1000);
-    analyzeComplexityForN(2000);
-    analyzeComplexityForN(5000);
-    analyzeComplexityForN(10000);
-    analyzeComplexityForN(20000);
-
-    std::cout << "\nWNIOSKI:" << std::endl;
-    std::cout << "1. std::find przeszukuje wektor liniowo, wiec pojedyncze operacje sa O(n)." << std::endl;
-    std::cout << "2. Przy wykonywaniu wielu operacji dla rosnacego N, calkowity czas rosnie szybciej niz liniowo (ok. kwadratowo)." << std::endl;
+    for (int n = startN; n <= endN; n += stepN) {
+        analyzeComplexityForN(n);
+    }
 }
 
 int main() {
     SimpleSet set;
 
-    // Testy podstawowych operacji
-    std::cout << "=== TESTY POPRAWNOSCI SimpleSet ===" << std::endl;
+    std::cout << "=== CORRECTNESS TESTS SimpleSet ===\n";
     set.insert("apple");
     set.insert("banana");
     set.insert("cherry");
-
-    std::cout << "Zbior po wstawieniu: ";
+    std::cout << "After insert: ";
     set.print();
 
     set.remove("banana");
-    std::cout << "Zbior po usunieciu 'banana': ";
+    std::cout << "After remove banana: ";
     set.print();
 
-    std::cout << "Czy 'apple' jest w zbiorze? " << (set.contains("apple") ? "TAK" : "NIE") << std::endl;
-    std::cout << "Czy 'banana' jest w zbiorze? " << (set.contains("banana") ? "TAK" : "NIE") << std::endl;
-    std::cout << "===================================\n" << std::endl;
+    std::cout << "Contains apple? " << (set.contains("apple") ? "YES" : "NO") << "\n";
+    std::cout << "Contains banana? " << (set.contains("banana") ? "YES" : "NO") << "\n";
+    std::cout << "==================================\n\n";
 
-    // Analiza złożoności obliczeniowej
-    analyzeComplexity();
-
+    // Many benchmark points to copy/paste into a file for gnuplot.
+    analyzeComplexityManyPoints();
     return 0;
 }
