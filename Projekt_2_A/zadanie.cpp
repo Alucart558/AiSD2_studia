@@ -73,14 +73,24 @@ public:
 
     size_t getSize() const { return N; }
 
-    //mapuje liczby całkowite z przedziału [n, m] na indeksy [0, m-n].
+    // mapuje liczby całkowite z przedziału [n, m] na indeksy [0, m-n].
     size_t mapIntegerRange(int x, int n, int m) const {
         if (n >= m) throw std::invalid_argument("mapIntegerRange: n must be < m");
         if (x < n || x > m) throw std::out_of_range("mapIntegerRange: integer out of [n, m]");
         return static_cast<size_t>(x - n);
     }
 
-    //mapuje ciąg n, n+2, n+4, ..., m na indeksy 0..k.
+    // ODWROTNOŚĆ mapIntegerRange: indeks [0, m-n] -> x z [n, m]
+    int unmapIntegerRange(size_t idx, int n, int m) const {
+        if (n >= m) throw std::invalid_argument("unmapIntegerRange: n must be < m");
+
+        const size_t maxIdx = static_cast<size_t>(m - n);
+        if (idx > maxIdx) throw std::out_of_range("unmapIntegerRange: index out of [0, m-n]");
+
+        return n + static_cast<int>(idx);
+    }
+
+    // mapuje ciąg n, n+2, n+4, ..., m na indeksy 0..k.
     size_t mapIntegerRangeStep2(int x, int n, int m) const {
         if (n >= m) throw std::invalid_argument("mapIntegerRangeStep2: n must be < m");
         if ((m - n) % 2 != 0) throw std::invalid_argument("mapIntegerRangeStep2: m and n must have the same parity");
@@ -90,13 +100,30 @@ public:
         return static_cast<size_t>((x - n) / 2);
     }
 
-    //mapuje literę 'a'..'z' na 0..25.
+    // ODWROTNOŚĆ mapIntegerRangeStep2: indeks [0..(m-n)/2] -> x z {n, n+2, ..., m}
+    int unmapIntegerRangeStep2(size_t idx, int n, int m) const {
+        if (n >= m) throw std::invalid_argument("unmapIntegerRangeStep2: n must be < m");
+        if ((m - n) % 2 != 0) throw std::invalid_argument("unmapIntegerRangeStep2: m and n must have the same parity");
+
+        const size_t maxIdx = static_cast<size_t>((m - n) / 2);
+        if (idx > maxIdx) throw std::out_of_range("unmapIntegerRangeStep2: index out of [0, (m-n)/2]");
+
+        return n + static_cast<int>(2 * idx);
+    }
+
+    // mapuje literę 'a'..'z' na 0..25.
     size_t mapCharLetter(char c) const {
         if (c < 'a' || c > 'z') throw std::out_of_range("mapCharLetter: expected 'a'..'z'");
         return static_cast<size_t>(c - 'a');
     }
 
-    //mapuje napisy dwuliterowe "aa".."zz" na 0..675 (bo 26×26).
+    // ODWROTNOŚĆ mapCharLetter: indeks [0..25] -> litera 'a'..'z'
+    char unmapCharLetter(size_t idx) const {
+        if (idx >= 26) throw std::out_of_range("unmapCharLetter: index out of [0, 25]");
+        return static_cast<char>('a' + idx);
+    }
+
+    // mapuje napisy dwuliterowe "aa".."zz" na 0..675 (bo 26×26).
     size_t mapTwoLetterString(const std::string& str) const {
         if (str.length() != 2) throw std::out_of_range("mapTwoLetterString: string length must be 2");
         char c1 = str[0], c2 = str[1];
@@ -104,6 +131,20 @@ public:
             throw std::out_of_range("mapTwoLetterString: expected letters 'a'..'z'");
         }
         return (static_cast<size_t>(c1 - 'a') * 26) + static_cast<size_t>(c2 - 'a');
+    }
+
+    // ODWROTNOŚĆ mapTwoLetterString: indeks [0..675] -> napis "aa".."zz"
+    std::string unmapTwoLetterString(size_t idx) const {
+        if (idx >= 26 * 26) throw std::out_of_range("unmapTwoLetterString: index out of [0, 675]");
+
+        const size_t first = idx / 26;   // 0..25
+        const size_t second = idx % 26;  // 0..25
+
+        std::string s;
+        s.resize(2);
+        s[0] = static_cast<char>('a' + first);
+        s[1] = static_cast<char>('a' + second);
+        return s;
     }
 };
 
@@ -220,7 +261,7 @@ static void runBenchmarksCsv() {
     const size_t N_end = 10000000;
     const int trials = 9;
 
-    volatile size_t sink = 0; // \[FIX\] function-scope sink
+    volatile size_t sink = 0; // [FIX] function-scope sink
 
     for (size_t N = N_start; N <= N_end; ) {
         SetSimple s1(N), s2(N);
