@@ -1,0 +1,1 @@
+CMakeLists.txt not found in C:\Users\dawib\CLionProjects\AiSD2_studia Select CMakeLists.txt

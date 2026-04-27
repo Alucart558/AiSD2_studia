@@ -1,0 +1,11 @@
+digraph G {
+    node [shape=circle];
+
+    // Połączenia dwukierunkowe między wszystkimi wierzchołkami
+    A -> B;
+    B -> A;
+    A -> C;
+    C -> A;
+    B -> C;
+    C -> B;
+}

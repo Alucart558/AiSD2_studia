@@ -1,0 +1,19 @@
+graph G {
+    node [style=filled];
+    L1 [fillcolor=green];
+    L2 [fillcolor=lightblue];
+    L3 [fillcolor=green];
+    L4 [fillcolor=orange];
+    L5 [fillcolor=pink];
+    L6 [fillcolor=lightblue];
+    L1 -- L2;
+    L1 -- L5;
+    L1 -- L6;
+    L2 -- L3;
+    L2 -- L4;
+    L2 -- L5;
+    L3 -- L4;
+    L3 -- L6;
+    L4 -- L5;
+    L5 -- L6;
+}
