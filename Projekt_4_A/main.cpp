@@ -16,17 +16,19 @@
 // ============================================================
 class GraphMatrix {
 private:
-    std::vector<std::vector<bool>> adj_;   // macierz połączeń
+    std::vector<std::vector<bool>> adj_;   // macierz połączeń , czy jest krawedz
     std::vector<std::vector<int>> edgeValue_; // wartości krawędzi
-    std::vector<bool> active_;             // czy wierzchołek istnieje
+    std::vector<bool> active_;             // czy wierzchołek istnieje (ID)
     std::vector<int> vertexValue_;         // wartości wierzchołków
 
+    //czy ID jest w zakresie tablic
     void validateId(int x) const {
         if (x < 0 || x >= static_cast<int>(active_.size())) {
             throw std::out_of_range("Nieprawidlowy identyfikator wierzcholka");
         }
     }
 
+    //czy wierzcholek istnieje
     void validateActive(int x) const {
         validateId(x);
         if (!active_[x]) {
@@ -38,18 +40,23 @@ public:
     // addVertex(G, x) - dodaje wierzchołek z wartością x
     // Złożoność: O(n) - trzeba rozszerzyć wiersze macierzy
     int addVertex(int value = 0) {
+        //n - liczba wierzcholkow przed dodaniem nowego
         const int n = static_cast<int>(active_.size());
 
+        //kazdy wiersz dodaje nowa kolumne z false (macierz polaczen)
         for (auto& row : adj_) {
             row.push_back(false);
         }
+        //kazdy wiersz dodaje nowa kolumne z 0 (macierz wartosci krawedzi)
         for (auto& row : edgeValue_) {
             row.push_back(0);
         }
 
+        //dodanie nowego wiersza
         adj_.emplace_back(n + 1, false);
         edgeValue_.emplace_back(n + 1, 0);
 
+        //informacje o nowym wierzcholku
         active_.push_back(true);
         vertexValue_.push_back(value);
 
@@ -61,23 +68,29 @@ public:
     void removeVertex(int x) {
         validateActive(x);
 
+        //n - liczba wierzcholkow przed usuniecem
         const int n = static_cast<int>(active_.size());
         for (int i = 0; i < n; ++i) {
+            // czyszczenie wszystkich krawedzi zwiazanych z x
             adj_[x][i] = false;
             adj_[i][x] = false;
             edgeValue_[x][i] = 0;
             edgeValue_[i][x] = 0;
         }
 
+        //oznaczamy wierzcholek x jako usuniety
         active_[x] = false;
+        //czyscimy jego wartosc
         vertexValue_[x] = 0;
     }
 
-    // adjacent(G, x, y) - sprawdza, czy istnieje krawędź
+    // adjacent(G, x, y) - sprawdza, czy istnieje krawędź miedzy wierzcholkami
     // Złożoność: O(1)
     bool adjacent(int x, int y) const {
+        //sprawdza poprawnosc ID
         validateActive(x);
         validateActive(y);
+        //odczytuje komorke macierzy sasiedztwa
         return adj_[x][y];
     }
 
@@ -86,11 +99,13 @@ public:
     std::vector<int> neighbours(int x) const {
         validateActive(x);
 
+        //lista ID sasiadow
         std::vector<int> result;
         result.reserve(active_.size());
 
         const int n = static_cast<int>(active_.size());
         for (int y = 0; y < n; ++y) {
+            //jesli jest aktywny i istnieje krawedz
             if (active_[y] && adj_[x][y]) {
                 result.push_back(y);
             }
@@ -222,6 +237,7 @@ void benchmarkNeighbours(const std::string& filename) {
     std::cout << "=== Benchmark neighbours(G, x) -> " << filename << " ===\n";
 
     const int REPS = 300;
+    //np.4096 dla wiekszej ilosci punktow
     const int N_MAX = 2048;
 
     std::vector<int> sizes;

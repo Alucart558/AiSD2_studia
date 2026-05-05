@@ -1,6 +1,12 @@
 graph TrafficLight {
-    node [shape=circle, style=filled, fillcolor=lightyellow];
+    node [shape=circle, style=filled];
     label="Graf kolizji na skrzyzowaniu";
+    L1 [fillcolor="lightblue"];
+    L2 [fillcolor="lightgreen"];
+    L3 [fillcolor="lightblue"];
+    L4 [fillcolor="lightpink"];
+    L5 [fillcolor="lightgoldenrod"];
+    L6 [fillcolor="lightgreen"];
     L1 -- L2;
     L1 -- L5;
     L1 -- L6;
