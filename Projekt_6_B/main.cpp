@@ -134,9 +134,9 @@ int main() {
     ladder.loadDictionary("slowa.txt");
 
     // Definiujemy słowo startowe - punkt wyjścia dla algorytmu BFS
-    string start = "ster";
+    string start = "mops";
     // Definiujemy słowo docelowe - punkt docelowy dla algorytmu BFS
-    string end = "atom";
+    string end = "ster";
 
     // Szukamy najkrótszej ścieżki od "ster" do "atom" - każda zmiana to zmiana 1 litery
     // Funkcja zwraca wektor słów reprezentujących tę ścieżkę, lub pusty wektor jeśli ścieżka nie istnieje
