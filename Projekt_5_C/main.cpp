@@ -1,189 +1,301 @@
-#include <iostream>       // Biblioteka do operacji wejścia/wyjścia (cout, endl)
-#include <vector>         // Biblioteka do dynamicznej tablicy wierzchołków
-#include <list>           // Biblioteka do listy krawędzi każdego wierzchołka
-#include <string>         // Biblioteka do obsługi ciągów znaków (nieużywana w tym kodzie)
-#include <algorithm>      // Biblioteka do algorytmów STL, m.in. remove_if (usuwanie warunkowe)
+#include <iostream>
+#include <vector>
+#include <list>
+#include <string>
+#include <algorithm>
+#include <fstream>
+#include <chrono>
 
 // Struktura reprezentująca krawędź grafu
 struct Edge {
-    int target;        // Identyfikator wierzchołka docelowego (dokąd prowadzi krawędź)
-    int value;         // Waga/wartość krawędzi (np. koszt, odległość w sieci)
+    int target;   // identyfikator wierzchołka docelowego
+    int value;    // waga krawędzi
 };
 
 // Struktura reprezentująca wierzchołek grafu
 struct Vertex {
-    int value;               // Wartość/etykieta przechowywana w wierzchołku
-    std::list<Edge> edges;   // Lista krawędzi wychodzących z tego wierzchołka
-    bool exists;             // Flaga określająca czy wierzchołek istnieje w grafie (domyślnie: false)
+    int value;              // wartość przechowywana w wierzchołku
+    std::list<Edge> edges;  // lista krawędzi wychodzących
+    bool exists = false;    // czy wierzchołek istnieje
 };
 
-// Klasa reprezentująca graf (skierowany lub nieskierowany)
+// Klasa reprezentująca graf skierowany / nieskierowany
 class Graph {
 private:
-    std::vector<Vertex> vertices;  // Wektor zawierający wierzchołki grafu (dostęp przez indeks)
-    bool isDirected;               // Flaga określająca typ grafu (true = skierowany, false = nieskierowany)
+    std::vector<Vertex> vertices;
+    bool isDirected;
 
 public:
-    // Konstruktor inicjalizujący graf z określonym typem (domyślnie: skierowany)
     Graph(bool directed = true) : isDirected(directed) {}
 
-    // 1. adjacent(G, x, y) - Sprawdza czy między wierzchołkami x i y istnieje bezpośrednia krawędź
+    // adjacent(G, x, y) - sprawdza czy x ma krawędź do y
+    // Złożoność: O(deg(x))
     bool adjacent(int x, int y) {
-        // Sprawdzenie czy wierzchołek x istnieje w wektorze i czy jest zaznaczony jako istniejący
-        if (x >= vertices.size() || !vertices[x].exists) return false;
-        // Przeszukanie listy krawędzi wychodzących z wierzchołka x
-        for (auto const& edge : vertices[x].edges) {
-            // Jeśli znaleziono krawędź do wierzchołka y, zwraca true
-            if (edge.target == y) return true;
+        if (x < 0 || x >= static_cast<int>(vertices.size()) || !vertices[x].exists) {
+            return false;
         }
-        // Jeśli pętla się skończyła bez znalezienia krawędzi, zwraca false
+
+        for (const auto& edge : vertices[x].edges) {
+            if (edge.target == y) {
+                return true;
+            }
+        }
         return false;
     }
 
-    // 2. neighbors(G, x) - Wypisuje wszystkich sąsiadów (wierzchołki bezpośrednio połączone z x)
-    void printNeighbors(int x) {
-        // Sprawdzenie czy wierzchołek x istnieje
-        if (x < vertices.size() && vertices[x].exists) {
-            // Wypisanie przygotowania do listy sąsiadów
-            std::cout << "Sąsiedzi wierzchołka " << x << ": ";
-            // Iteracja po wszystkich krawędziach wychodzących z wierzchołka x
-            for (auto const& edge : vertices[x].edges) {
-                // Wypisanie identyfikatora wierzchołka docelowego
-                std::cout << edge.target << " ";
-            }
-            // Przejście do nowej linii
-            std::cout << std::endl;
+    // neighbours(G, x) - zwraca listę sąsiadów wierzchołka x
+    // Złożoność: O(deg(x))
+    std::vector<int> neighbours(int x) {
+        std::vector<int> result;
+
+        if (x < 0 || x >= static_cast<int>(vertices.size()) || !vertices[x].exists) {
+            return result;
         }
+
+        for (const auto& edge : vertices[x].edges) {
+            result.push_back(edge.target);
+        }
+        return result;
     }
 
-    // 3. addVertex(G, x) - Dodaje nowy wierzchołek o indeksie x do grafu
+    // printNeighbors(G, x) - wypisuje sąsiadów wierzchołka x
+    void printNeighbors(int x) {
+        if (x < 0 || x >= static_cast<int>(vertices.size()) || !vertices[x].exists) {
+            return;
+        }
+
+        std::cout << "Sąsiedzi wierzchołka " << x << ": ";
+        for (const auto& edge : vertices[x].edges) {
+            std::cout << edge.target << " ";
+        }
+        std::cout << std::endl;
+    }
+
+    // addVertex(G, x) - dodaje wierzchołek o indeksie x
     void addVertex(int x) {
-        // Rozszerzenie wektora jeśli x znajduje się poza aktualnym rozmiarem
-        if (x >= vertices.size()) vertices.resize(x + 1);
-        // Zaznaczenie wierzchołka jako istniejącego
+        if (x < 0) return;
+
+        if (x >= static_cast<int>(vertices.size())) {
+            vertices.resize(x + 1);
+        }
         vertices[x].exists = true;
     }
 
-    // 4. removeVertex(G, x) - Usuwa wierzchołek x i wszystkie jego krawędzie
+    // removeVertex(G, x) - usuwa wierzchołek x i wszystkie krawędzie związane z nim
+    // Złożoność: O(V + E)
     void removeVertex(int x) {
-        // Sprawdzenie czy wierzchołek x istnieje w wektorze
-        if (x < vertices.size()) {
-            // Zaznaczenie wierzchołka jako nieistniejącego (logiczne usunięcie)
-            vertices[x].exists = false;
-            // Wyczyszczenie listy krawędzi wychodzących z wierzchołka x
-            vertices[x].edges.clear();
-            // Iteracja po WSZYSTKICH wierzchołkach w grafie
-            for (auto& v : vertices) {
-                // Usunięcie wszystkich krawędzi wchodzących do wierzchołka x z dowolnego wierzchołka
-                // remove_if: usuwa elementy spełniające warunek, bez zmiany rozmiaru listy
-                // erase: usuwa efektywnie elementy zmienionego zakresu
-                v.edges.remove_if([x](const Edge& e) { return e.target == x; });
-            }
+        if (x < 0 || x >= static_cast<int>(vertices.size()) || !vertices[x].exists) {
+            return;
+        }
+
+        vertices[x].exists = false;
+        vertices[x].edges.clear();
+
+        for (auto& v : vertices) {
+            v.edges.remove_if([x](const Edge& e) {
+                return e.target == x;
+            });
         }
     }
 
-    // 5. addEdge(G, x, y) - Dodaje krawędź od wierzchołka x do wierzchołka y
+    // addEdge(G, x, y) - dodaje krawędź x -> y
+    // Złożoność: O(deg(x))
     void addEdge(int x, int y) {
-        // Sprawdzenie czy krawędź już istnieje (unikanie duplikatów)
-        if (adjacent(x, y)) return;
-        // Dodanie krawędzi do listy krawędzi wychodzących z wierzchołka x (waga domyślnie 0)
+        if (x < 0 || y < 0) return;
+        if (x >= static_cast<int>(vertices.size()) || y >= static_cast<int>(vertices.size())) return;
+        if (!vertices[x].exists || !vertices[y].exists) return;
+
+        if (adjacent(x, y)) {
+            return;
+        }
+
         vertices[x].edges.push_back({y, 0});
-        // Jeśli graf jest nieskierowany, dodaj również krawędź powrotną (x <- y)
+
         if (!isDirected) {
             vertices[y].edges.push_back({x, 0});
         }
     }
 
-    // 6. removeEdge(G, x, y) - Usuwa krawędź od wierzchołka x do wierzchołka y
+    // removeEdge(G, x, y) - usuwa krawędź x -> y
+    // Złożoność: O(deg(x))
     void removeEdge(int x, int y) {
-        // Sprawdzenie czy wierzchołek x istnieje w wektorze
-        if (x < vertices.size()) {
-            // Usunięcie wszystkich krawędzi z wierzchołka x do y
-            vertices[x].edges.remove_if([y](const Edge& e) { return e.target == y; });
-            // Jeśli graf jest nieskierowany, usuń również krawędź powrotną
-            if (!isDirected && y < vertices.size()) {
-                vertices[y].edges.remove_if([x](const Edge& e) { return e.target == x; });
-            }
+        if (x < 0 || y < 0) return;
+        if (x >= static_cast<int>(vertices.size()) || y >= static_cast<int>(vertices.size())) return;
+        if (!vertices[x].exists || !vertices[y].exists) return;
+
+        vertices[x].edges.remove_if([y](const Edge& e) {
+            return e.target == y;
+        });
+
+        if (!isDirected) {
+            vertices[y].edges.remove_if([x](const Edge& e) {
+                return e.target == x;
+            });
         }
     }
 
-    // 7. getVertexValue - Zwraca wartość przechowywana w wierzchołku x
-    int getVertexValue(int x) { return vertices[x].value; }
+    // getVertexValue(G, x)
+    int getVertexValue(int x) {
+        return vertices[x].value;
+    }
 
-    // 8. setVertexValue - Ustawia wartość przechowywana w wierzchołku x
-    void setVertexValue(int x, int v) { vertices[x].value = v; }
+    // setVertexValue(G, x, v)
+    void setVertexValue(int x, int v) {
+        vertices[x].value = v;
+    }
 
-    // 9. getEdgeValue - Zwraca wartość (wagę) krawędzi od x do y
+    // getEdgeValue(G, x, y)
     int getEdgeValue(int x, int y) {
-        // Iteracja po listach krawędzi wychodzących z wierzchołka x
-        for (auto& edge : vertices[x].edges) {
-            // Jeśli znaleziono krawędź do y, zwraca jej wagę
-            if (edge.target == y) return edge.value;
+        if (x < 0 || y < 0 || x >= static_cast<int>(vertices.size()) || y >= static_cast<int>(vertices.size())) {
+            return -1;
         }
-        // Jeśli krawędź nie istnieje, zwraca -1 (kod błędu)
+
+        for (const auto& edge : vertices[x].edges) {
+            if (edge.target == y) {
+                return edge.value;
+            }
+        }
         return -1;
     }
 
-    // 10. setEdgeValue - Ustawia wartość (wagę) krawędzi od x do y
+    // setEdgeValue(G, x, y, v)
     void setEdgeValue(int x, int y, int v) {
-        // Iteracja po listach krawędzi wychodzących z wierzchołka x
+        if (x < 0 || y < 0 || x >= static_cast<int>(vertices.size()) || y >= static_cast<int>(vertices.size())) {
+            return;
+        }
+
         for (auto& edge : vertices[x].edges) {
-            // Jeśli znaleziono krawędź do y, przypisz jej nową wagę
-            if (edge.target == y) edge.value = v;
+            if (edge.target == y) {
+                edge.value = v;
+            }
         }
     }
 };
 
-// Główna funkcja programu
-int main() {
-    // Inicjalizacja grafu skierowanego (true oznacza że krawędzie mają kierunek)
+// Benchmark: mierzymy złożoność neighbours(G, x)
+void benchmarkNeighbours(const std::string& filename) {
+    std::ofstream out(filename);
+    if (!out.is_open()) {
+        std::cerr << "Nie mozna otworzyc pliku: " << filename << std::endl;
+        return;
+    }
+
+    out << "# n czas_ns\n";
+    std::cout << "=== Benchmark neighbours(G, x) -> " << filename << " ===\n";
+
+    const int REPS = 300;
+    const int N_MAX = 2048;
+
+    std::vector<int> sizes;
+    for (int p = 6; (1 << p) <= N_MAX; ++p) {
+        sizes.push_back(1 << p);
+        if ((1 << p) * 3 / 2 <= N_MAX) {
+            sizes.push_back((1 << p) * 3 / 2);
+        }
+    }
+
+    volatile std::size_t sink = 0;
+
+    for (int n : sizes) {
+        Graph g(true);
+
+        for (int i = 0; i < n; ++i) {
+            g.addVertex(i);
+        }
+
+        // Graf gwiazda: 0 połączony ze wszystkimi
+        for (int i = 1; i < n; ++i) {
+            g.addEdge(0, i);
+        }
+
+        std::vector<long long> times(REPS);
+
+        for (int r = 0; r < REPS; ++r) {
+            auto t0 = std::chrono::high_resolution_clock::now();
+
+            auto neigh = g.neighbours(0);
+            sink += neigh.size();
+
+            auto t1 = std::chrono::high_resolution_clock::now();
+            times[r] = std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count();
+        }
+
+        std::sort(times.begin(), times.end());
+        long long med = times[REPS / 2];
+
+        out << n << " " << med << "\n";
+        std::cout << "  n=" << n << "  mediana=" << med << " ns\n";
+    }
+
+    if (sink == 123456789) {
+        std::cout << "";
+    }
+
+    std::cout << "Dane zapisane do " << filename << "\n";
+}
+
+// Generuje skrypt gnuplot
+void writeGnuplot(const std::string& dataFile, const std::string& scriptFile) {
+    std::ofstream gp(scriptFile);
+    if (!gp.is_open()) {
+        std::cerr << "Nie mozna otworzyc pliku: " << scriptFile << std::endl;
+        return;
+    }
+
+    gp << R"(set title 'Zlozonosc neighbours(G, x) - graf na listach sasiedztwa'
+set xlabel 'Liczba wierzcholkow (n)'
+set ylabel 'Czas [ns]'
+set grid
+set key top left
+
+f(x) = a*x + b
+fit f(x) ')" << dataFile << R"(' using 1:2 via a,b
+
+plot ')" << dataFile << R"(' using 1:2 with points pt 7 ps 0.8 lc rgb '#0077BB' title 'pomiary', \
+     f(x) with lines lw 2 lc rgb '#CC3311' title sprintf('fit: %.3f*n + %.1f', a, b)
+pause -1 'Nacisnij Enter'
+)";
+
+    std::cout << "Skrypt gnuplot zapisany do " << scriptFile << "\n";
+}
+
+// Demo działania grafu
+void demo() {
+    std::cout << "=== Demo poprawnosci ===\n";
+
     Graph g(true);
 
-    // === ETAP 1: Dodanie wierzchołków do grafu ===
-    g.addVertex(0);  // Dodanie wierzchołka o indeksie 0
-    g.addVertex(1);  // Dodanie wierzchołka o indeksie 1
-    g.addVertex(2);  // Dodanie wierzchołka o indeksie 2
+    g.addVertex(0);
+    g.addVertex(1);
+    g.addVertex(2);
 
-    // === ETAP 2: Dodanie krawędzi między wierzchołkami ===
-    g.addEdge(0, 1); // Dodanie krawędzi 0 -> 1 (z 0 do 1, bo graf jest skierowany)
-    g.addEdge(0, 2); // Dodanie krawędzi 0 -> 2
-    g.addEdge(1, 2); // Dodanie krawędzi 1 -> 2
+    g.addEdge(0, 1);
+    g.addEdge(0, 2);
+    g.addEdge(1, 2);
 
-    // === ETAP 3: Przypisanie wartości wierzchołkom i wagom krawędziom ===
-    g.setVertexValue(0, 100);  // Przypisanie wartości 100 do wierzchołka 0
-    g.setEdgeValue(0, 1, 50);  // Przypisanie wagi 50 do krawędzi 0->1
+    g.setVertexValue(0, 100);
+    g.setEdgeValue(0, 1, 50);
 
-    // === ETAP 4: Testowanie funkcji adjacent() - sprawdzenie czy istnieje krawędź ===
-    // Sprawdzenie czy 0->1 istnieje (powinno być true, bo dodaliśmy tę krawędź w ETAP 2)
     std::cout << "Czy 0 jest sąsiadem 1? " << (g.adjacent(0, 1) ? "Tak" : "Nie") << std::endl;
-    // Sprawdzenie czy 2->0 istnieje (powinno być false, bo takiej krawędzi nie dodaliśmy)
     std::cout << "Czy 2 jest sąsiadem 0? " << (g.adjacent(2, 0) ? "Tak" : "Nie") << std::endl;
 
-    // === ETAP 5: Wypisanie sąsiadów wierzchołka (funkcja printNeighbors) ===
-    // Wypisze wierzchołki do których prowadzą krawędzie z wierzchołka 0 (czyli 1 i 2)
     g.printNeighbors(0);
 
-    // === ETAP 6: Wypisanie wartości wierzchołków i wag krawędzi ===
-    // Wypisanie wartości przypisanej do wierzchołka 0 (powinna być 100 z ETAP 3)
     std::cout << "Wartość wierzchołka 0: " << g.getVertexValue(0) << std::endl;
-    // Wypisanie wagi przypisanej do krawędzi 0->1 (powinna być 50 z ETAP 3)
     std::cout << "Wartość krawędzi 0->1: " << g.getEdgeValue(0, 1) << std::endl;
 
-    // === ETAP 7: Testowanie usuwania krawędzi ===
-    std::cout << "\nUsuwanie krawędzi 0->2..." << std::endl;
-    // Usunięcie krawędzi 0->2, wierzchołek 2 będzie już stracony z sąsiadów 0
+    std::cout << "\nUsuwanie krawędzi 0->2...\n";
     g.removeEdge(0, 2);
-    // Wypisanie sąsiadów po usunięciu - powinna pozostać tylko krawędź 0->1
     g.printNeighbors(0);
 
-    // === ETAP 8: Testowanie usuwania wierzchołka ===
-    std::cout << "Usuwanie wierzchołka 1..." << std::endl;
-    // Usunięcie wierzchołka 1 oraz wszystkich krawędzi do/z niego
-    // (includes removal of edge 0->1 that was added in ETAP 2)
+    std::cout << "Usuwanie wierzchołka 1...\n";
     g.removeVertex(1);
-    // Wypisanie sąsiadów nach usunięcia wierzchołka - lista powinna być pusta
     g.printNeighbors(0);
+}
 
-    // Zwrócenie kodu wyjścia (0 oznacza sukces)
+int main() {
+    demo();
+    benchmarkNeighbours("benchmark_graph.txt");
+    writeGnuplot("benchmark_graph.txt", "plot_graph.gp");
     return 0;
 }
